@@ -99,25 +99,39 @@ function Stop-VoirLeProf($quoi) {
     exit 1
 }
 
-# Windows Update (TrustedInstaller/TiWorker) verrouille les fichiers système
-# utilisés par DISM et `wsl --install` : attendre, plutôt que de laisser
-# l'élève croire que le script est figé pendant potentiellement 10+ minutes.
+# Une operation de maintenance en cours verrouille les fichiers systeme dont
+# DISM et `wsl --install` ont besoin. Attendre vaut mieux que d'echouer, ou que
+# de laisser l'eleve croire le script fige pendant dix minutes.
+#
+# On ne regarde que TiWorker, le processus qui fait reellement le travail. Le
+# service TrustedInstaller, lui, est demarre par n'importe quelle operation de
+# maintenance, y compris nos propres appels a Get-WindowsOptionalFeature, et il
+# reste ensuite actif une dizaine de minutes sans rien faire : s'y fier faisait
+# attendre pour rien apres un simple redemarrage, en affirmant a l'eleve qu'une
+# mise a jour etait en cours alors que Windows Update le disait a jour.
 function Test-WindowsUpdateBusy {
-    $ti = Get-Service -Name TrustedInstaller -ErrorAction SilentlyContinue
-    if ($null -ne $ti -and $ti.Status -eq "Running") { return $true }
-    if (Get-Process -Name TiWorker -ErrorAction SilentlyContinue) { return $true }
-    return $false
+    return ($null -ne (Get-Process -Name TiWorker -ErrorAction SilentlyContinue))
 }
 
+# L'attente est bornee. Au-dela, on continue : si les fichiers sont vraiment
+# verrouilles, l'etape suivante echouera en le disant, ce qui vaut mieux qu'une
+# attente sans fin devant un ecran muet.
 function Wait-WindowsUpdateIdle {
     if (-not (Test-WindowsUpdateBusy)) { return }
-    Write-Host "Windows Update est en cours d'installation, on patiente avant de continuer..." -ForegroundColor Yellow
-    while (Test-WindowsUpdateBusy) {
+    $limite = 180
+    Write-Host "Windows termine une operation de maintenance, on patiente (au plus $limite s)..." -ForegroundColor Yellow
+    $ecoule = 0
+    while ((Test-WindowsUpdateBusy) -and ($ecoule -lt $limite)) {
         Start-Sleep -Seconds 10
+        $ecoule += 10
         Write-Host "." -NoNewline
     }
     Write-Host ""
-    Write-Host "Windows Update a terminé, reprise de l'installation." -ForegroundColor Green
+    if (Test-WindowsUpdateBusy) {
+        Write-Host "Toujours en cours apres $limite s, on continue quand meme." -ForegroundColor Yellow
+    } else {
+        Write-Host "Termine, reprise de l'installation." -ForegroundColor Green
+    }
 }
 
 

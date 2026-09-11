@@ -202,8 +202,19 @@ créer un utilisateur Debian, écrire `/etc/wsl.conf` ou poser `DefaultUid` sous
   par `code "$(nsi dir)"`, puis laisse un shell (`exec bash -l`). Le `$` est
   échappé en `` `$ `` pour que PowerShell le laisse à bash.
 
-`Wait-WindowsUpdateIdle` est appelé avant DISM et avant `wsl --install` : sans
-ça l'élève croit le script figé pendant dix minutes.
+`Wait-WindowsUpdateIdle` est appelé avant DISM et avant `wsl --install` : une
+opération de maintenance en cours verrouille les fichiers dont ils ont besoin.
+
+Il ne regarde que le processus **`TiWorker`**, jamais le service
+`TrustedInstaller`. Ce service est démarré par n'importe quelle opération de
+maintenance, **y compris les appels à `Get-WindowsOptionalFeature` de ce
+script**, et reste ensuite actif une dizaine de minutes sans rien faire. S'y
+fier faisait attendre pour rien après un redémarrage, en affirmant à l'élève
+qu'une mise à jour était en cours alors que Windows Update le disait à jour.
+
+L'attente est bornée à 180 s, après quoi on continue : si les fichiers sont
+vraiment verrouillés, l'étape suivante échouera en le disant, ce qui vaut mieux
+qu'une attente sans fin devant un écran muet.
 
 ### Encodage
 
