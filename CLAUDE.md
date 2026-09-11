@@ -198,9 +198,14 @@ créer un utilisateur Debian, écrire `/etc/wsl.conf` ou poser `DefaultUid` sous
   `curl`, appelle `setup.sh`, et **révoque le NOPASSWD dans un `finally`** :
   il ne doit pas survivre à un échec de `setup.sh`.
 - `Set-PadawanParDefaut`, `/etc/wsl.conf` + `DefaultUid`, puis `--terminate`.
-- `Open-ConsoleDebian`, console interactive qui lance `nsi init`, ouvre VSCode
-  par `code "$(nsi dir)"`, puis laisse un shell (`exec bash -l`). Le `$` est
-  échappé en `` `$ `` pour que PowerShell le laisse à bash.
+- `Open-ConsoleDebian` : console interactive qui ouvre VSCode par
+  `code "$(nsi dir)"` puis laisse un shell (`exec bash -l`). Le `$` est échappé
+  en `` `$ `` pour que PowerShell le laisse à bash. **`nsi init` n'y est lancé
+  que s'il reste à faire** (`nsi dir >/dev/null || nsi init`) : `setup.sh` l'a
+  peut-être déjà fait, car lancé par `wsl.exe` depuis une console PowerShell il
+  trouve `/dev/tty` ouvrable même avec `stdin` branché sur le tuyau de `curl`.
+  Sans cette garde, l'élève se voyait redemander son jeton une seconde fois,
+  juste après l'ouverture de VSCode.
 
 `Wait-WindowsUpdateIdle` est appelé avant DISM et avant `wsl --install` : une
 opération de maintenance en cours verrouille les fichiers dont ils ont besoin.

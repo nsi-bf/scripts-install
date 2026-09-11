@@ -133,9 +133,14 @@ assurer_path
 # existe même quand aucun terminal n'y répond, donc `[ -e /dev/tty ]` ne suffit
 # pas à décider.
 #
-# Sans terminal, on ne tente rien : côté Windows, c'est la console que
-# setup-windows.ps1 ouvre à la fin qui lancera `nsi init`, celle-là même où
-# l'élève pourra taper.
+# Ce test répond oui plus souvent qu'on ne croit. Lancé par `wsl.exe` depuis
+# une console PowerShell, ce script trouve /dev/tty ouvrable, alors même que
+# stdin est le tuyau de curl (mesuré le 2026-09-11). C'est donc lui qui
+# configure GitHub sur le parcours Windows, et la console ouverte ensuite par
+# setup-windows.ps1 ne relance `nsi init` que s'il reste à faire.
+#
+# Sans terminal, on ne tente rien : c'est alors cette console finale qui s'en
+# charge, et l'élève y tapera son jeton.
 echo ""
 if (exec </dev/tty) 2>/dev/null; then
     echo "Installation terminée. Configuration de ton compte GitHub."

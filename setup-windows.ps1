@@ -524,7 +524,13 @@ function Open-ConsoleDebian {
     # `nsi dir` imprime le dossier de cours, que seul `nsi init` connaît : il
     # dépend de l'équipe GitHub de l'élève. Le `$` est échappé en `` `$ `` pour
     # que PowerShell le laisse à bash.
-    Start-Process $script:Wsl -ArgumentList "-d $Distro -u $WslUser -- bash -lc `"cd ~ && nsi init && code `$(nsi dir); exec bash -l`""
+    #
+    # `nsi init` n'est lancé que s'il reste à faire. setup.sh l'a peut-être
+    # déjà fait : lancé par `wsl.exe` depuis une console PowerShell, il trouve
+    # /dev/tty ouvrable, même avec stdin branché sur le tuyau de curl (mesuré
+    # le 2026-09-11). Sans cette garde, l'élève se voyait redemander son jeton
+    # une seconde fois, juste après l'ouverture de VSCode.
+    Start-Process $script:Wsl -ArgumentList "-d $Distro -u $WslUser -- bash -lc `"cd ~ && { nsi dir >/dev/null 2>&1 || nsi init; } && code `$(nsi dir); exec bash -l`""
 }
 
 
