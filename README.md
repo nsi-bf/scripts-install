@@ -50,11 +50,9 @@ nsi init
 
 Il te sera demandé un **token d'accès personnel** (une sorte de mot de passe sécurisé). Ton dépôt et ton identité git sont retrouvés automatiquement à partir de ce token : rien d'autre à taper.
 
-Pour créer ton token : va sur [https://github.com/settings/tokens](https://github.com/settings/tokens), clique sur **Generate new token (classic)**, et coche les deux portées **`repo`** et **`read:org`**.
+Pour créer ton token : va sur [https://github.com/settings/tokens](https://github.com/settings/tokens), clique sur **Generate new token (classic)**, et coche la portée **`repo`**.
 
-> `read:org` sert à retrouver ta classe : sans elle, `nsi init` ne trouvera pas ton dépôt.
->
-> **Attention : le token ne s'affiche qu'une seule fois, copie-le immédiatement.**
+> **Attention : le token ne s'affiche qu'une seule fois, copie-le immédiatement.** Garde-le en lieu sûr : `nsi init` le redemande à chaque fois. Si tu l'as perdu, révoque-le et crée-en un nouveau.
 
 Une fois terminé, **VSCode s'ouvre automatiquement** dans ton dépôt. C'est là que tu travailleras.
 

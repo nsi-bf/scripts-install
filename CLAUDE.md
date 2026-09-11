@@ -322,15 +322,34 @@ modification d'un côté est à répercuter à la main de l'autre.
 
 ### `nsi init`
 
-Interdit à root. Demande un seul champ : un token d'accès personnel, portées
-`repo` **et** `read:org` (`read:org` sert à retrouver l'équipe ; `repo` seul ne
-suffit pas).
+Interdit à root. Demande un seul champ : un token d'accès personnel, portée
+**`repo`** seule.
 
-Ne demande ni classe ni nom de dépôt : il lit le pseudo (`gh api user`),
-calcule l'année scolaire, retrouve l'équipe (`gh api /user/teams`), en déduit
-dépôt et dossier selon la convention ci-dessus. Si aucune équipe ou aucun dépôt
-n'est trouvé (élève pas encore inscrit, invitations pas acceptées, classe pas
-encore mise en place), affiche une erreur et s'arrête sans rien créer.
+Ne demande ni classe ni nom de dépôt. Il lit le pseudo (`gh api user`), liste
+les dépôts auxquels l'élève a accès (`gh api /user/repos`), garde ceux qui
+suivent la convention `<classe>_<AAAA-AAAA>-<pseudo>` dans `nsi-bf`, et prend
+**le plus récent** par date de création. L'équipe s'en déduit en retirant le
+suffixe `-<pseudo>`, et donne le nom du dossier local. Si rien ne correspond
+(élève pas encore inscrit, invitations pas acceptées, classe pas encore mise en
+place), affiche une erreur et s'arrête sans rien créer.
+
+**Pourquoi pas l'année scolaire.** La version précédente calculait l'année en
+cours, avec bascule au 1ᵉʳ août, et cherchait une équipe finissant par
+`_<année>` via `/user/teams`. Trois défauts : échec net si la classe était
+créée en avance ou en retard sur ce calendrier, noms d'équipe non triables (une
+vieille `Term2425` ne finit même pas par une année), et la portée `read:org`
+imposée au jeton — c'était le seul appel qui la réclamait. La date de création
+des dépôts, elle, tranche sans convention supplémentaire.
+
+**Le filtrage se fait en shell, pas en jq.** `gh api --jq` **n'accepte pas
+`--arg`** (aucun dans `gh api --help`), donc on ne peut pas lui passer
+`$pseudo` ; et `jq` n'est pas installé par `nsi install base`. C'est ce `--arg`
+qui cassait la recherche d'équipe : avec `set -euo pipefail`, `nsi init`
+mourait sur « unknown flag: --arg », avant même son message d'erreur. Le filtre
+est donc un `awk`, choisi plutôt qu'un `grep` parce qu'il rend 0 même sans
+correspondance — un `grep` muet ferait échouer l'affectation sous `pipefail` —
+et les classes de chiffres y sont écrites en clair, les intervalles `{4}`
+n'étant pas garantis par tous les `awk`.
 
 - `git config user.name` = pseudo GitHub (pas de nom réel demandé).
 - `git config user.email` = `<pseudo>@users.noreply.github.com` : l'API `/user`

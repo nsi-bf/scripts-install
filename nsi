@@ -607,7 +607,7 @@ cmd_init() {
     echo "Pour en créer un :"
     echo "  1. Va sur https://github.com/settings/tokens"
     echo "  2. Clique sur 'Generate new token (classic)'"
-    echo "  3. Donne-lui un nom (ex: 'NSI'), sélectionne les portées 'repo' et 'read:org'"
+    echo "  3. Donne-lui un nom (ex: 'NSI') et coche la portée 'repo'"
     echo "  4. Clique sur 'Generate token' et copie-le IMMEDIATEMENT
      ATTENTION : le token ne s'affiche qu'une seule fois, il sera impossible de le retrouver ensuite !"
     echo ""
@@ -625,39 +625,53 @@ cmd_init() {
     git config --global user.name  "$pseudo"
     git config --global user.email "${pseudo}@users.noreply.github.com"
 
-    # Le prof inscrit chaque élève dans une équipe GitHub "<classe>_<année>"
-    # (voir metatest/outils/equipe_github.py) : on la retrouve plutôt que de
-    # demander la classe, l'année scolaire bascule le 1er août.
-    local mois annee_debut annee teams equipe
-    mois="$(date +%m)"; mois="${mois#0}"
-    annee_debut="$(date +%Y)"
-    (( mois < 8 )) && annee_debut=$((annee_debut - 1))
-    annee="${annee_debut}-$((annee_debut + 1))"
+    # Le dépôt de l'élève se déduit de ses dépôts, pas d'un calendrier.
+    #
+    # On demandait l'équipe de l'année scolaire en cours, calculée avec une
+    # bascule au 1er août. Trois défauts : l'élève échouait net si sa classe
+    # était créée un peu en avance ou en retard sur ce calendrier, les noms
+    # d'équipe ne se trient pas (une vieille "Term2425" ne finit même pas par
+    # une année), et l'appel à /user/teams imposait la portée `read:org` au
+    # jeton — une case de plus à cocher pour un débutant.
+    #
+    # On liste donc ses dépôts. La documentation de `affiliation` est explicite
+    # sur ce qu'on y trouve : `collaborator` désigne « repositories that the
+    # user has been added to as a collaborator », et c'est exactement ainsi que
+    # le prof lui donne accès au sien. La valeur par défaut du paramètre
+    # l'inclut déjà.
+    #
+    # Le filtre sur <classe>_<AAAA-AAAA>-<pseudo> écarte ce qui ne vient pas de
+    # cette convention — les vieux dépôts GitHub Classroom, par exemple — et le
+    # tri par date de création donne le plus récent, donc celui de cette année.
+    # Le filtrage se fait en shell, pas en jq : `gh api --jq` n'accepte pas
+    # `--arg` — il n'y en a aucun dans `gh api --help` — donc on ne peut pas
+    # lui passer $pseudo, et `jq` n'est pas installé par `nsi install base`.
+    # C'est d'ailleurs ce `--arg` qui cassait la recherche d'équipe : avec
+    # `set -euo pipefail`, nsi init mourait sur « unknown flag: --arg ».
+    #
+    # awk plutôt que grep : il rend 0 même sans correspondance, là où un grep
+    # muet ferait échouer l'affectation sous `pipefail`. Et les classes de
+    # chiffres sont écrites en clair, les intervalles {4} n'étant pas garantis
+    # par tous les awk.
+    local depots repo_name equipe motif
+    motif="^${GITHUB_ORG}/[A-Za-z0-9._-]+_[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]-${pseudo//./\\.}$"
+    depots="$(gh api "/user/repos?per_page=100" --paginate \
+        --jq '.[] | [.created_at, .full_name] | @tsv' \
+        | awk -v motif="$motif" '$2 ~ motif' | sort -r)"
 
-    # shellcheck disable=SC2016  # $org et $an sont des variables jq (--arg), pas shell
-    teams="$(gh api --paginate /user/teams --jq --arg org "$GITHUB_ORG" --arg an "$annee" \
-        '.[] | select(.organization.login==$org and (.name | endswith("_" + $an))) | .name')"
-
-    if [[ -z "$teams" ]]; then
-        echo "Aucune équipe trouvée dans $GITHUB_ORG pour l'année $annee." >&2
-        echo "Vérifie que tu as accepté l'invitation reçue par email (organisation" >&2
-        echo "et équipe), et que ton prof a bien mis en place ta classe." >&2
+    if [[ -z "$depots" ]]; then
+        echo "Aucun dépôt de cours trouvé pour $pseudo dans $GITHUB_ORG." >&2
+        echo "Vérifie que tu as accepté les invitations reçues par email" >&2
+        echo "(organisation, puis dépôt), et que ton prof a bien mis en place" >&2
+        echo "ta classe." >&2
         exit 1
     fi
 
-    # Terminale (T...) prioritaire sur première (P...) en cas d'équipes multiples.
-    equipe="$(grep '^T' <<< "$teams" | head -n1)"
-    [[ -z "$equipe" ]] && equipe="$(head -n1 <<< "$teams")"
-
-    local repo_name="${equipe}-${pseudo}"
-
-    echo ""
-    if ! gh repo view "$GITHUB_ORG/$repo_name" &>/dev/null; then
-        echo "Dépôt introuvable : $GITHUB_ORG/$repo_name" >&2
-        echo "Vérifie que ton prof a bien mis en place ta classe, et que tu as" >&2
-        echo "accepté l'invitation reçue par email." >&2
-        exit 1
-    fi
+    repo_name="$(head -n1 <<< "$depots" | cut -f2)"
+    repo_name="${repo_name#"$GITHUB_ORG/"}"
+    # L'équipe est le nom du dépôt privé de son suffixe : elle donne le nom du
+    # dossier local, distinct d'une année sur l'autre.
+    equipe="${repo_name%-"$pseudo"}"
 
     local dossier="$HOME/${equipe:?}"
 
