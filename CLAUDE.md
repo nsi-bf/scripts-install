@@ -38,24 +38,128 @@ Servis depuis GitHub raw (branche `main`), sans releases à gérer.
 
 Idempotent. Ne connaît **aucun** outil pédagogique : ni `nsi`, ni `uv`, ni gleam.
 
-1. Installe VSCode via `winget` + l'extension `ms-vscode-remote.remote-wsl`
-2. Vérifie les fonctionnalités Windows de WSL2 ; s'il en manque, affiche en
-   ROUGE de redémarrer et de relancer la commande, puis s'arrête
-3. Vérifie que `wsl.exe` existe, et s'arrête en ROUGE sinon (Windows trop
-   ancien, ou installation abîmée) ; il est résolu par chemin absolu, pas par
-   le PATH, un PowerShell 32 bits étant redirigé vers `SysWOW64` où il n'est pas
-4. Installe WSL Debian (`wsl --install -d Debian`)
-5. Crée l'utilisateur `padawan` / `padawan`, groupe `sudo`
-6. Pose un `sudoers.d` NOPASSWD temporaire (l'installation qui suit tourne sans
-   terminal, personne ne pourrait taper un mot de passe), installe `curl`,
-   appelle `setup.sh` dans WSL, puis révoque le NOPASSWD
-7. Définit `padawan` comme utilisateur par défaut (`/etc/wsl.conf` + clé de
-   registre `DefaultUid`)
-8. Ouvre une console Debian interactive qui lance `nsi git`, puis laisse un
-   shell (`exec bash`)
+### Deux situations, une seule commande
 
-Attend que Windows Update ait fini avant DISM et `wsl --install` : sans ça
-l'élève croit le script figé pendant dix minutes.
+| | Chez l'élève | Au lycée |
+|---|---|---|
+| Droits | administrateur de sa machine | **pas** administrateur, et ne peut pas l'être |
+| VSCode, WSL | à installer | déjà posés par l'image du poste |
+| Ce que fait le script | tout | va droit à la Debian |
+
+**On ne demande pas à l'élève où il est** : la machine sait répondre, et un
+débutant peut se tromper. Deux sondes, sans élévation et **sans rien exécuter** :
+
+- WSL installé ? `Test-WslInstalle` lit la présence du service **`WSLService`**
+  *ou* **`LxssManager`**, sinon celle du paquet Store
+  `MicrosoftCorporationII.WindowsSubsystemForLinux`. Les deux noms sont
+  nécessaires : il y a deux WSL, et sur une machine à jour c'est `WSLService`
+  qui existe et `LxssManager` qui manque (mesuré, WSL 2.7.13.0).
+- VSCode ? `code` trouvable dans le PATH, puis dans les trois dossiers
+  d'installation connus.
+
+**Ne jamais sonder en appelant `wsl.exe`.** Invoqué alors que WSL n'est pas
+installé, il propose de s'installer et le fait au bout d'une trentaine de
+secondes, quelle que soit l'option passée : une sonde qui déclenche ce qu'elle
+mesure n'est pas une sonde.
+
+`Get-WindowsOptionalFeature -Online` exige l'élévation (« L'opération demandée
+nécessite une élévation »), donc il ne s'exécute que dans la branche
+administrateur.
+
+**Un marqueur tranche le cas intermédiaire.** Sur une machine neuve, le
+premier lancement active les fonctionnalités WSL et demande un redémarrage.
+Au lancement suivant, l'état est indiscernable d'un poste de lycée :
+`LxssManager` existe, VSCode est installé — la sonde répondrait « rien à
+élever », alors que WSL n'a été ni mis à jour ni passé en version 2. Le script
+pose donc `HKCU\SOFTWARE\nsi-bf\InstallationWindowsEnCours` juste avant de
+demander le redémarrage, le relit dans `Get-BesoinAdmin`, et l'efface quand le
+travail côté Windows est fini. Un redémarrage étant obligatoire sur toute
+machine neuve, ce n'est pas un cas rare mais le parcours normal.
+
+**Ordre : élévation d'abord, mot d'accueil ensuite.** Dans l'autre sens,
+l'élève lit le texte, appuie sur entrée, accepte l'UAC, et retrouve le même
+texte et la même attente dans la fenêtre élevée.
+
+Une distribution WSL est enregistrée **par utilisateur**, pas par machine :
+même sur un poste du lycée où WSL est là, l'élève n'a pas encore sa Debian.
+Sa présence se lit sous `HKCU\...\Lxss` (`Get-DistroKey`), pas avec
+`wsl --list --quiet` dont la sortie est en UTF-16.
+
+### Structure
+
+Le script est découpé en fonctions, et son déroulé tient en dix lignes à la
+fin du fichier :
+
+```powershell
+Show-Accueil
+$Wsl  = Get-WslPath
+$Code = Get-CodePath
+if (Get-BesoinAdmin) { Request-Admin; Install-CoteWindows } else { … }
+Install-ExtensionWsl
+Install-Debian
+New-UtilisateurPadawan
+Install-EnvironnementEleve
+Set-PadawanParDefaut
+Open-ConsoleDebian
+```
+
+`$Wsl` et `$Code` sont partagés : affectés au niveau script, relus et réécrits
+par les fonctions via `$script:`.
+
+**Branche administrateur** — `Install-CoteWindows` seule, et tout ce qu'elle
+appelle : `wsl --shutdown` de remise à zéro (réservé à ce cas, il couperait les
+autres fenêtres de l'élève au lycée), `Initialize-Winget`, `Install-VSCode`,
+`Enable-FonctionnalitesWsl`, `Update-Wsl`, WSL 2 par défaut, puis
+`Clear-Marqueur`.
+
+Ce `wsl --shutdown` est gardé par `Test-WslInstalle`, pas seulement par la
+présence du binaire : sinon c'est lui qui déclencherait l'auto-installation de
+WSL qu'on cherche à éviter.
+
+- `Initialize-Winget` — si `winget` manque, message ROUGE disant de **ne pas
+  insister** et de demander l'assistance du professeur, puis arrêt : les trois
+  voies pour l'installer (Store, `Repair-WinGetPackageManager`, `.msixbundle`
+  de GitHub) sont hors de portée d'un débutant seul chez lui. Sinon le met à
+  jour par lui-même, silencieusement.
+- `Install-VSCode` — relit le PATH machine et utilisateur après l'installation,
+  celui du processus étant figé à son démarrage.
+- `Enable-FonctionnalitesWsl` — si une fonctionnalité manquait, affiche en
+  ROUGE de redémarrer et de relancer la commande, puis s'arrête.
+- `Update-Wsl` — `wsl --update`, repli `--web-download`. Jamais fatal, et
+  silencieux même en échec : le code de sortie d'un `--update` sur un WSL déjà
+  à jour n'est pas connu, donc un avertissement conditionnel risquerait de
+  s'afficher à chaque installation réussie. Un WSL trop vieux échouera
+  franchement à l'installation de Debian.
+
+**Commun aux deux** — root *dans* WSL n'est pas administrateur *de Windows* :
+créer un utilisateur Debian, écrire `/etc/wsl.conf` ou poser `DefaultUid` sous
+`HKCU` se font avec les droits de l'élève.
+
+- `Install-ExtensionWsl` — pose `ms-vscode-remote.remote-wsl` **dans les deux
+  cas** : les extensions VSCode s'installent par utilisateur, dans son profil,
+  donc que l'image du lycée porte VSCode ne dit rien de ce que l'élève a dans
+  le sien — et sans elle il ne peut pas ouvrir son dossier WSL depuis VSCode,
+  c'est-à-dire travailler. Aucun droit requis, idempotente.
+- `Install-Debian` — `wsl --install -d Debian` si la clé `Lxss` de
+  l'utilisateur ne la contient pas, puis première initialisation en root.
+- `New-UtilisateurPadawan` — `padawan` / `padawan`, groupe `sudo`.
+- `Install-EnvironnementEleve` — pose le `sudoers.d` NOPASSWD (l'installation
+  tourne sans terminal, personne ne pourrait taper un mot de passe), installe
+  `curl`, appelle `setup.sh`, et **révoque le NOPASSWD dans un `finally`** :
+  il ne doit pas survivre à un échec de `setup.sh`.
+- `Set-PadawanParDefaut` — `/etc/wsl.conf` + `DefaultUid`, puis `--terminate`.
+- `Open-ConsoleDebian` — console interactive qui lance `nsi git`, puis laisse
+  un shell (`exec bash`).
+
+`Wait-WindowsUpdateIdle` est appelé avant DISM et avant `wsl --install` : sans
+ça l'élève croit le script figé pendant dix minutes.
+
+### Encodage
+
+Le fichier est en UTF-8 **sans BOM**, et ça ne doit pas changer : `iex` sur une
+chaîne qui commence par un BOM échoue. Les accents sont sûrs malgré l'absence
+de BOM parce que GitHub raw sert `charset=utf-8` et que `irm` décode en
+conséquence — mesuré le 2026-09-11 sous Windows PowerShell 5.1.
 
 ## setup.sh
 
