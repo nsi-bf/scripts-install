@@ -13,6 +13,18 @@
 
 $ErrorActionPreference = "Stop"
 
+# --- Journal ---
+# Sans lui, on ne sait rien : la fenetre elevee peut se fermer avant qu'on ait
+# pu lire quoi que ce soit, et une erreur d'analyse du script empeche meme le
+# catch global de s'executer. Le fichier, lui, reste.
+#
+# Sur le Bureau plutot que dans %TEMP% : un eleve doit pouvoir le retrouver et
+# l'envoyer sans qu'on lui explique ou chercher.
+$Bureau = [Environment]::GetFolderPath("Desktop")
+if ([string]::IsNullOrEmpty($Bureau)) { $Bureau = $env:TEMP }
+$LogPath = Join-Path $Bureau "nsi-installation.log"
+try { Start-Transcript -Path $LogPath -Append -Force | Out-Null } catch { }
+
 $SetupUrl   = "https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1"
 $SetupShUrl = "https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.sh"
 $Distro     = "Debian"
@@ -65,6 +77,11 @@ function Stop-VoirLeProf($quoi) {
     Write-Red ""
     Write-Red "N'INSISTE PAS, DEMANDE DE L'ASSISTANCE A TON PROFESSEUR."
     Write-Red ""
+    Write-Red "Un compte rendu a ete ecrit dans :"
+    Write-Red "  $LogPath"
+    Write-Red "Envoie ce fichier a ton professeur."
+    Write-Red ""
+    try { Stop-Transcript | Out-Null } catch { }
     Read-Host "Appuie sur entrée pour quitter"
     exit 1
 }
@@ -256,8 +273,11 @@ function Show-Accueil {
 function Request-Admin {
     if (Test-Admin) { return }
     try {
+        # -NoExit : sans lui, la fenetre elevee se ferme instantanement si le
+        # script echoue avant son propre try/catch, par exemple sur une erreur
+        # d'analyse. On ne verrait alors rien du tout.
         Start-Process PowerShell -Verb RunAs `
-            -ArgumentList "-ExecutionPolicy Bypass -Command `"irm '$SetupUrl' | iex`""
+            -ArgumentList "-NoExit -ExecutionPolicy Bypass -Command `"irm '$SetupUrl' | iex`""
         exit
     } catch {
         # Refus de l'UAC, ou compte sans droit d'élévation. On dit laquelle :
@@ -514,9 +534,13 @@ try {
     Write-Red "ERREUR : $_"
     Write-Red "Ligne  : $($_.InvocationInfo.ScriptLineNumber) - $($_.InvocationInfo.Line.Trim())"
     try { Show-Diagnostic } catch {}
+    Write-Red "Compte rendu ecrit dans : $LogPath"
+    Write-Red "Envoie ce fichier a ton professeur."
     Write-Host ""
+    try { Stop-Transcript | Out-Null } catch { }
     Read-Host "Appuie sur entrée pour quitter"
     exit 1
 }
 
+try { Stop-Transcript | Out-Null } catch { }
 Read-Host "Appuie sur entrée pour quitter"
