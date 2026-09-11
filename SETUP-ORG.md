@@ -65,7 +65,7 @@ Ce que metatest fait, et ne fait pas :
 Un dépôt engendré depuis un modèle n'a aucun lien avec lui : GitHub ne sait pas
 propager une correction, d'où `--rafraichir`.
 
-`nsi settings` lit les mêmes fichiers dans ce dépôt, avec le jeton de l'élève
+`nsi reset-config` lit les mêmes fichiers dans ce dépôt, avec le jeton de l'élève
 (`TEMPLATE_FICHIERS` et `TEMPLATE_REPO` dans [`nsi`](nsi)). Ces quatre chemins
 doivent donc exister dans le modèle.
 
@@ -98,7 +98,7 @@ classe, création de son dépôt depuis le modèle, ajout en collaborateur
 | Dépôt élève | `<équipe>-<compte>` — `1G3_2026-2027-Marie-Dupont` |
 | Dossier local | `~/<équipe>` |
 
-Contrat partagé : metatest l'écrit (`nom_equipe`/`nom_depot`), `nsi git` le
+Contrat partagé : metatest l'écrit (`nom_equipe`/`nom_depot`), `nsi init` le
 relit. Rien ne synchronise les deux dépôts — une modification d'un côté est à
 répercuter à la main de l'autre.
 
@@ -118,9 +118,9 @@ le dit ; `--forcer` passe outre.
 
 - [ ] `equipe_github.py` sur une classe d'un seul élève test
 - [ ] accepter les deux invitations reçues (organisation, puis dépôt)
-- [ ] `nsi git` — le dépôt se clone sans rien demander de plus que le token
+- [ ] `nsi init` — le dépôt se clone sans rien demander de plus que le token
 - [ ] modifier un fichier, `nsi push`, vérifier le commit sur GitHub
-- [ ] sur une autre machine (ou après suppression du dossier), `nsi git` puis
+- [ ] sur une autre machine (ou après suppression du dossier), `nsi init` puis
       `nsi pull` récupère la modification
 
 ## Pense-bête

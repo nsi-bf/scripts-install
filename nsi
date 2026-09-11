@@ -13,6 +13,14 @@ TEMPLATE_FICHIERS=(.vscode/settings.json .vscode/extensions.json
 # n'exigent sudo. ~/.local/bin passe avant /usr/local/bin dans le PATH.
 INSTALL_PATH="$HOME/.local/bin/nsi"
 
+# Où vit le dépôt de l'élève. Une variable shell ne survivrait pas d'une
+# invocation à l'autre — chaque `nsi` est un nouveau processus — et le
+# recalculer demanderait un appel à l'API GitHub, donc du réseau et une
+# authentification, à chaque `nsi push`. On l'écrit donc une fois, dans
+# `nsi init`, et les autres commandes le relisent.
+ETAT_DIR="$HOME/.config/nsi"
+ETAT_DOSSIER="$ETAT_DIR/dossier"
+
 # --- Détection OS ---
 
 is_wsl() { grep -qi microsoft /proc/version 2>/dev/null; }
@@ -25,7 +33,16 @@ ensure_brew() {
     has_brew && return 0
     is_mac || return 0
     echo "Installation de Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Avec stdin branché sur un tuyau — le cas quand nsi est appelé depuis
+    # `curl … | bash` — l'installeur Homebrew bascule de lui-même en mode non
+    # interactif (`elif [[ ! -t 0 ]]`), et passe alors `sudo -n`, qui ne
+    # demande jamais de mot de passe. Sur un Mac neuf il s'arrête aussitôt sur
+    # « Need sudo access on macOS ». On lui rebranche donc un vrai terminal.
+    if (exec </dev/tty) 2>/dev/null; then
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/tty
+    else
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
     if [[ -f /opt/homebrew/bin/brew ]]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
     elif [[ -f /usr/local/bin/brew ]]; then
@@ -157,6 +174,20 @@ install_vscode() {
     command -v code &>/dev/null && return 0
     if has_brew; then
         brew install --cask visual-studio-code
+    elif has_apt; then
+        # Le dépôt officiel Microsoft, comme pour gh. Sans cette branche, une
+        # Debian sans snap n'installait rien : on tombait dans le `else`, qui
+        # se contentait d'un message sur stderr, et `code` manquait ensuite.
+        # La clé est posée telle quelle, en ASCII armé : apt accepte un
+        # `signed-by` qui pointe sur un `.asc` depuis Debian 11. Passer par
+        # `gpg --dearmor` supposerait `gnupg` installé, ce qui n'est pas
+        # garanti sur une Debian minimale.
+        curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+            | sudo dd of=/usr/share/keyrings/microsoft.asc
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/microsoft.asc] https://packages.microsoft.com/repos/code stable main" \
+            | sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
+        _pkg_upgraded=false
+        pkg_install code
     elif has_dnf; then
         sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
         printf '[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc\n' \
@@ -436,9 +467,9 @@ remove_rust() {
 
 # --- hide ---
 
-cmd_hide() {
+cmd_toggle_config() {
     local settings=".vscode/settings.json"
-    [[ -f "$settings" ]] || { echo "Fichier $settings introuvable. Lance nsi git d'abord." >&2; exit 1; }
+    [[ -f "$settings" ]] || { echo "Fichier $settings introuvable. Lance nsi init d'abord." >&2; exit 1; }
     python3 - "$settings" <<'EOF'
 import json, sys
 path = sys.argv[1]
@@ -456,7 +487,8 @@ EOF
 
 # --- settings ---
 
-cmd_settings() {
+cmd_reset_config() {
+    aller_dans_le_depot
     local f
     mkdir -p .vscode
     for f in "${TEMPLATE_FICHIERS[@]}"; do
@@ -504,28 +536,73 @@ cmd_update() {
 
 # --- push / pull ---
 
+memoriser_dossier() {
+    mkdir -p "$ETAT_DIR"
+    printf '%s\n' "$1" > "$ETAT_DOSSIER"
+}
+
+# Le chemin mémorisé, s'il désigne toujours un dépôt git. Rend 1 sinon : le
+# dossier a pu être renommé, déplacé ou supprimé à la main.
+dossier_eleve() {
+    [[ -f "$ETAT_DOSSIER" ]] || return 1
+    local d
+    d="$(cat "$ETAT_DOSSIER")"
+    [[ -n "$d" && -d "$d/.git" ]] || return 1
+    printf '%s\n' "$d"
+}
+
+# Se placer dans le dépôt de l'élève avant d'agir. Sans ça, `nsi push` lancé
+# depuis ~ fait `git add -A` sur le dossier personnel, et `nsi reset-config`
+# y déverse .vscode/, pyproject.toml et .gitignore.
+aller_dans_le_depot() {
+    local d
+    if ! d="$(dossier_eleve)"; then
+        echo "Je ne sais pas où est ton dépôt de cours." >&2
+        echo "Lance d'abord : nsi init" >&2
+        exit 1
+    fi
+    cd "$d" || exit 1
+}
+
+# Imprime le dossier de cours de l'élève, et rien d'autre : c'est la seule
+# commande de nsi faite pour être composée — `code "$(nsi dir)"`. Les scripts
+# d'amorçage l'utilisent plutôt que de lire $ETAT_DOSSIER, dont le chemin et le
+# format ne regardent que nsi.
+cmd_dir() {
+    local d
+    if ! d="$(dossier_eleve)"; then
+        echo "Je ne sais pas où est ton dépôt de cours." >&2
+        echo "Lance d'abord : nsi init" >&2
+        exit 1
+    fi
+    printf '%s\n' "$d"
+}
+
 cmd_push() {
+    aller_dans_le_depot
     git add -A
     git commit -m "Sauvegarde du $(date '+%Y-%m-%d %H:%M')" || true
     git push
 }
 
 cmd_pull() {
+    aller_dans_le_depot
     git pull
 }
 
 # --- git ---
 
-cmd_git() {
+cmd_init() {
     if [[ "$(id -u)" -eq 0 ]]; then
-        echo "Erreur : 'nsi git' ne doit pas être lancé avec sudo." >&2
-        echo "Lance simplement : nsi git" >&2
+        echo "Erreur : 'nsi init' ne doit pas être lancé avec sudo." >&2
+        echo "Lance simplement : nsi init" >&2
         exit 1
     fi
     echo ""
     echo "Configuration de Git et GitHub"
     echo "=============================="
     echo ""
+
     echo "Il te faut un token d'accès personnel GitHub."
     echo "Pour en créer un :"
     echo "  1. Va sur https://github.com/settings/tokens"
@@ -535,8 +612,11 @@ cmd_git() {
      ATTENTION : le token ne s'affiche qu'une seule fois, il sera impossible de le retrouver ensuite !"
     echo ""
     read -rp "Token GitHub : " github_token
-
     echo "$github_token" | gh auth login --with-token
+
+    # Idempotent, et hors du test : `gh auth login` n'authentifie que `gh`,
+    # pas `git`. Sans cet enregistrement de `gh` comme credential helper,
+    # `nsi push` et `nsi pull` ne seraient pas authentifiés.
     gh auth setup-git
 
     local pseudo
@@ -554,6 +634,7 @@ cmd_git() {
     (( mois < 8 )) && annee_debut=$((annee_debut - 1))
     annee="${annee_debut}-$((annee_debut + 1))"
 
+    # shellcheck disable=SC2016  # $org et $an sont des variables jq (--arg), pas shell
     teams="$(gh api --paginate /user/teams --jq --arg org "$GITHUB_ORG" --arg an "$annee" \
         '.[] | select(.organization.login==$org and (.name | endswith("_" + $an))) | .name')"
 
@@ -578,20 +659,40 @@ cmd_git() {
         exit 1
     fi
 
-    echo "Dépôt $repo_name trouvé. Récupération en local..."
-    rm -rf "$HOME/$equipe"
-    gh repo clone "$GITHUB_ORG/$repo_name" "$HOME/$equipe"
+    local dossier="$HOME/${equipe:?}"
+
+    # On ne supprime jamais le dossier de l'élève. C'est pourtant ce que faisait
+    # `nsi init` : il commençait par un `rm -rf`, si bien que relancer la commande
+    # — ce qu'on lui dit de faire au moindre souci de jeton — effaçait tout ce
+    # qui n'était pas encore poussé. Le `:?` sur $equipe est la ceinture : vide,
+    # le chemin aurait désigné le dossier personnel tout entier.
+    if [[ -d "$dossier/.git" ]]; then
+        echo "Dossier déjà présent : ~/$equipe (rien n'est effacé)."
+    elif [[ -e "$dossier" ]]; then
+        echo "Erreur : ~/$equipe existe déjà et n'est pas un dépôt git." >&2
+        echo "Renomme-le ou déplace-le, puis relance 'nsi init'." >&2
+        exit 1
+    else
+        echo "Dépôt $repo_name trouvé. Récupération en local..."
+        gh repo clone "$GITHUB_ORG/$repo_name" "$dossier"
+    fi
+
+    # Mémorisé seulement si le dossier existe pour de bon : un clone échoué
+    # laisserait sinon un chemin mensonger dans l'état, et `nsi push` irait
+    # chercher un dépôt qui n'est pas là.
+    if [[ -d "$dossier/.git" ]]; then
+        memoriser_dossier "$dossier"
+    fi
 
     # Rien à déployer : les fichiers de configuration viennent du dépôt
     # template, dont le dépôt de l'élève est issu. On n'écrase jamais son
-    # travail ici ; c'est `nsi settings` qui remet ces fichiers à neuf.
-    cd "$HOME/$equipe"
+    # travail ici ; c'est `nsi reset-config` qui remet ces fichiers à neuf.
+    cd "$dossier"
     uv sync
 
-    echo ""
-    echo "Tout est prêt ! Ouverture de VSCode..."
-    code "$HOME/$equipe"
-
+    # Pas d'ouverture de VSCode ici : lancer un éditeur est une commodité
+    # d'amorçage, pas le travail de cette commande. C'est `setup.sh` qui s'en
+    # charge, une fois, à la fin de l'installation.
     echo ""
     echo "Git et GitHub configurés pour $pseudo."
     echo "Dépôt : $repo_name  —  Dossier : ~/$equipe"
@@ -655,8 +756,11 @@ case "$cmd" in
     update)
         cmd_update
         ;;
-    git)
-        cmd_git
+    init)
+        cmd_init
+        ;;
+    dir)
+        cmd_dir
         ;;
     push)
         cmd_push
@@ -664,19 +768,20 @@ case "$cmd" in
     pull)
         cmd_pull
         ;;
-    settings)
-        cmd_settings
+    reset-config)
+        cmd_reset_config
         ;;
-    hide)
-        cmd_hide
+    toggle-config)
+        cmd_toggle_config
         ;;
     *)
         echo "Usage: nsi install|remove base|gleam|postgresql|openjdk|nasm|rust|prolog|c" >&2
         echo "       nsi update" >&2
-        echo "       nsi git" >&2
+        echo "       nsi init" >&2
         echo "       nsi push | nsi pull" >&2
-        echo "       nsi settings" >&2
-        echo "       nsi hide" >&2
+        echo "       nsi dir" >&2
+        echo "       nsi reset-config" >&2
+        echo "       nsi toggle-config" >&2
         exit 1
         ;;
 esac

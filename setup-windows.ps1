@@ -409,7 +409,15 @@ function Open-ConsoleDebian {
     Write-Host "Installation terminée !" -ForegroundColor Green
     Write-Host ""
     Write-Host "Une console Debian va s'ouvrir. Suis les instructions pour configurer ton compte GitHub." -ForegroundColor Cyan
-    Start-Process $script:Wsl -ArgumentList "-d $Distro -u $WslUser -- bash -c `"cd ~ && nsi git; exec bash`""
+    # `bash -lc`, pas `bash -c` : un shell de connexion lit ~/.profile, donc
+    # ~/.local/bin entre dans le PATH et `nsi` est trouvable. Mesuré sur une
+    # Debian, environnement vierge : `bash -c` donne
+    # /usr/local/bin:/usr/bin:/bin:/sbin et rien d'autre — `nsi init` échouerait
+    # sur un « command not found » dès la console finale.
+    # `nsi dir` imprime le dossier de cours, que seul `nsi init` connaît : il
+    # dépend de l'équipe GitHub de l'élève. Le `$` est échappé en `` `$ `` pour
+    # que PowerShell le laisse à bash.
+    Start-Process $script:Wsl -ArgumentList "-d $Distro -u $WslUser -- bash -lc `"cd ~ && nsi init && code `$(nsi dir); exec bash -l`""
 }
 
 

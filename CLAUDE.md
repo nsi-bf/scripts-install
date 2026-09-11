@@ -2,7 +2,7 @@
 
 Un élève dispose d'**une commande** à copier-coller dans un terminal pour
 obtenir un environnement de développement complet, puis d'une seconde
-(`nsi git`) pour être relié à son dépôt.
+(`nsi init`) pour être relié à son dépôt.
 
 Ce sont de jeunes élèves débutants : tout doit être simple et idempotent.
 
@@ -136,10 +136,24 @@ créer un utilisateur Debian, écrire `/etc/wsl.conf` ou poser `DefaultUid` sous
 `HKCU` se font avec les droits de l'élève.
 
 - `Install-ExtensionWsl` — pose `ms-vscode-remote.remote-wsl` **dans les deux
-  cas** : les extensions VSCode s'installent par utilisateur, dans son profil,
-  donc que l'image du lycée porte VSCode ne dit rien de ce que l'élève a dans
-  le sien — et sans elle il ne peut pas ouvrir son dossier WSL depuis VSCode,
-  c'est-à-dire travailler. Aucun droit requis, idempotente.
+  cas**, y compris au lycée. Les extensions VSCode s'installent par
+  utilisateur, dans son profil : que l'image du poste porte VSCode ne dit rien
+  de ce que l'élève a dans le sien. Aucun droit requis, idempotente.
+
+  **Ce n'est pas un confort, c'est ce qui fait que VSCode s'ouvre à la fin de
+  l'installation.** `nsi init` termine par `code "$dossier"`. Sous WSL, ce
+  `code` est le script livré par l'installation *Windows* de VSCode, atteint
+  par l'interop. Ce script détecte WSL via `$WSL_DISTRO_NAME`, puis cherche
+  l'extension par `--locate-extension ms-vscode-remote.remote-wsl` : s'il la
+  trouve, il délègue à `wslCode.sh`, qui installe le serveur VSCode dans la
+  distribution et ouvre une fenêtre Remote-WSL sur le chemin Linux. **Sinon il
+  retombe sur sa branche finale et passe `/home/padawan/…` au VSCode Windows,
+  qui ne sait pas l'ouvrir.** Retirer cette ligne casse la dernière étape de
+  l'installation, sans rien dire.
+
+  (`~/.vscode-server/bin/…/remote-cli/code` masque le script Windows quand il
+  existe, mais il n'apparaît qu'après une première connexion Remote-WSL : sur
+  une Debian neuve, c'est bien le script Windows qui opère.)
 - `Install-Debian` — `wsl --install -d Debian` si la clé `Lxss` de
   l'utilisateur ne la contient pas, puis première initialisation en root.
 - `New-UtilisateurPadawan` — `padawan` / `padawan`, groupe `sudo`.
@@ -148,8 +162,9 @@ créer un utilisateur Debian, écrire `/etc/wsl.conf` ou poser `DefaultUid` sous
   `curl`, appelle `setup.sh`, et **révoque le NOPASSWD dans un `finally`** :
   il ne doit pas survivre à un échec de `setup.sh`.
 - `Set-PadawanParDefaut` — `/etc/wsl.conf` + `DefaultUid`, puis `--terminate`.
-- `Open-ConsoleDebian` — console interactive qui lance `nsi git`, puis laisse
-  un shell (`exec bash`).
+- `Open-ConsoleDebian` — console interactive qui lance `nsi init`, ouvre VSCode
+  par `code "$(nsi dir)"`, puis laisse un shell (`exec bash -l`). Le `$` est
+  échappé en `` `$ `` pour que PowerShell le laisse à bash.
 
 `Wait-WindowsUpdateIdle` est appelé avant DISM et avant `wsl --install` : sans
 ça l'élève croit le script figé pendant dix minutes.
@@ -163,12 +178,39 @@ conséquence — mesuré le 2026-09-11 sous Windows PowerShell 5.1.
 
 ## setup.sh
 
-Identique sur les trois plateformes, aucune condition à écrire.
+Identique sur les trois plateformes, aucune condition de système à écrire.
 
-- Installe `curl` s'il est absent (seul paquet système qu'il pose)
-- Télécharge `nsi` dans `~/.local/bin`
-- Lance `nsi install base`
-- Indique `nsi git` comme étape suivante
+- Refuse de tourner en **root** : `curl … | sudo bash` poserait `nsi` dans
+  `/root/.local/bin`, invisible pour l'élève, et casserait Homebrew sur macOS.
+- Dit ce qui va se passer : rester connecté à Internet, mot de passe possible
+  pour les paquets système. **Sans jamais attendre de saisie** — il est aussi
+  appelé par `setup-windows.ps1` via `wsl -- bash -c "curl … | bash"`, sans
+  terminal : un `read` bloquerait.
+- Installe `curl` s'il est absent (seul paquet système qu'il pose).
+- Télécharge `nsi` dans `~/.local/bin`, par renommage atomique.
+- **`assurer_path`** : garantit qu'un shell de connexion trouvera `nsi`.
+  Sur Debian, `~/.profile` ajoute `~/.local/bin` *si le dossier existe*, et il
+  vient d'être créé — rien à faire. Sur **macOS**, le shell par défaut est zsh,
+  qui ne lit pas `~/.profile` du tout : sans cette fonction, `nsi` ne serait
+  jamais dans le PATH et le `nsi init` annoncé échouerait.
+  - La sonde tourne sous `env -i` : sinon le shell de connexion hérite du PATH
+    courant et répond « c'est bon » alors qu'un terminal neuf ne trouvera rien.
+  - Écrit dans `~/.zprofile` sous zsh ; sinon `~/.bash_profile`, `~/.bash_login`
+    ou `~/.profile`, dans cet ordre — bash lit `~/.bash_profile` **à la place**
+    de `~/.profile` quand il existe.
+  - N'écrit rien si un shell de connexion résout déjà `nsi`, ni si le fichier
+    mentionne déjà `.local/bin`.
+- Lance `nsi install base`, par chemin absolu : `~/.local/bin` n'est pas encore
+  dans le PATH de ce shell-ci.
+- Enchaîne sur **`nsi init`** puis ouvre VSCode sur `nsi dir`, quand un
+  terminal répond, en lisant depuis
+  `/dev/tty`. Deux obstacles l'imposent : sous `curl … | bash` stdin est le
+  tuyau de curl, et il n'y a pas toujours de terminal de contrôle. Le test est
+  `(exec </dev/tty)`, pas `[ -e /dev/tty ]` : le fichier existe même quand
+  aucun terminal n'y répond. Sans terminal — le cas de l'appel depuis
+  `setup-windows.ps1` — il ne tente rien et indique `nsi init` comme étape
+  suivante : c'est la console ouverte par `Open-ConsoleDebian` qui s'en charge,
+  et c'est là que l'élève peut taper.
 
 ## nsi
 
@@ -224,10 +266,12 @@ porte cette décision.
 nsi install <composant>
 nsi remove <composant>
 nsi update
-nsi git         # configuration initiale de git et GitHub
-nsi push        # commit horodaté + push
-nsi pull        # pull
-nsi settings    # remet la configuration du projet à la version du modèle
+nsi init          # première mise en route : GitHub, dépôt, VSCode
+nsi push          # commit horodaté + push
+nsi pull          # pull
+nsi dir           # imprime le dossier de cours, pour `code "$(nsi dir)"`
+nsi reset-config  # remet la configuration du projet à celle du modèle
+nsi toggle-config # bascule l'affichage des fichiers de config dans VSCode
 ```
 
 ## Structure du repo
@@ -260,7 +304,7 @@ dépôts, dépôt-modèle. Ce dépôt-ci ne contient aucun outil d'administratio
 
 **Contrat partagé avec metatest, documenté à l'identique des deux côtés** —
 metatest l'écrit (`nom_equipe`/`nom_depot` dans `outils/equipe_github.py`),
-`nsi git` le relit. Deux dépôts distincts, rien ne les synchronise : une
+`nsi init` le relit. Deux dépôts distincts, rien ne les synchronise : une
 modification d'un côté est à répercuter à la main de l'autre.
 
 - **Année scolaire** : `AAAA-AAAA+1`, bascule le 1ᵉʳ août. Ex. `2026-2027`.
@@ -276,7 +320,7 @@ modification d'un côté est à répercuter à la main de l'autre.
 - **Désambiguïsation** si plusieurs équipes la même année (ne devrait pas
   arriver) : celle commençant par `T` l'emporte sur celle en `P`.
 
-### `nsi git`
+### `nsi init`
 
 Interdit à root. Demande un seul champ : un token d'accès personnel, portées
 `repo` **et** `read:org` (`read:org` sert à retrouver l'équipe ; `repo` seul ne
@@ -299,7 +343,40 @@ encore mise en place), affiche une erreur et s'arrête sans rien créer.
 Clone ensuite le dépôt dans `~/<équipe>`, lance `uv sync`, ouvre VSCode.
 **Ne déploie aucun fichier** : ils viennent du modèle dont le dépôt est issu.
 
-### `nsi settings`
+**Ne supprime jamais rien.** Si `~/<équipe>` est déjà un dépôt git, il est
+gardé tel quel ; s'il existe sans être un dépôt git, la commande s'arrête et le
+dit. La version précédente commençait par `rm -rf "$HOME/$equipe"` : relancer
+`nsi init`, ce qu'on demande à l'élève au moindre souci de jeton, effaçait tout
+ce qui n'était pas poussé.
+
+### Où vit le dépôt de l'élève
+
+`push`, `pull` et `reset-config` travaillaient dans le répertoire courant.
+Lancés depuis `~`, le premier faisait `git add -A` sur le dossier personnel et
+le dernier y déversait `.vscode/`, `pyproject.toml` et `.gitignore`.
+
+Le chemin est donc **mémorisé** par `nsi init` dans `~/.config/nsi/dossier`, et
+les trois commandes commencent par `aller_dans_le_depot`. Une variable shell ne
+suffirait pas : chaque `nsi` est un nouveau processus. Et le recalculer
+demanderait un appel à l'API GitHub — réseau et authentification — à chaque
+`nsi push`.
+
+- `nsi init` n'écrit le chemin que si `<dossier>/.git` existe : un clone échoué
+  laisserait sinon un chemin mensonger.
+- `dossier_eleve` revérifie `.git` à chaque lecture : le dossier a pu être
+  renommé ou supprimé à la main. Dans ce cas, message clair et renvoi vers
+  `nsi init`.
+- **`nsi dir`** l'imprime, et rien d'autre : c'est la seule commande de `nsi`
+  faite pour être composée. `setup.sh` et `Open-ConsoleDebian` l'utilisent
+  (`code "$(nsi dir)"`) plutôt que de lire `~/.config/nsi/dossier`, dont le
+  chemin et le format ne regardent que `nsi`.
+
+**Ouvrir VSCode n'appartient qu'aux scripts d'amorçage**, pas à `nsi init` :
+lancer un éditeur est une commodité de première mise en route, pas le travail
+d'une commande qui configure et clone. `setup.sh` le fait sur Mac et Linux,
+`Open-ConsoleDebian` sur Windows.
+
+### `nsi reset-config`
 
 Retélécharge les fichiers de configuration depuis `nsi-bf/template-eleves` et
 les écrase. Commande explicite, avec avertissement à l'élève : elle réinitialise

@@ -45,14 +45,14 @@ Ouvre **VSCode**, puis ouvre un terminal intégré (`Terminal > Nouveau terminal
 Dans ce terminal, tape :
 
 ```
-nsi git
+nsi init
 ```
 
 Il te sera demandé un **token d'accès personnel** (une sorte de mot de passe sécurisé). Ton dépôt et ton identité git sont retrouvés automatiquement à partir de ce token : rien d'autre à taper.
 
 Pour créer ton token : va sur [https://github.com/settings/tokens](https://github.com/settings/tokens), clique sur **Generate new token (classic)**, et coche les deux portées **`repo`** et **`read:org`**.
 
-> `read:org` sert à retrouver ta classe : sans elle, `nsi git` ne trouvera pas ton dépôt.
+> `read:org` sert à retrouver ta classe : sans elle, `nsi init` ne trouvera pas ton dépôt.
 >
 > **Attention : le token ne s'affiche qu'une seule fois, copie-le immédiatement.**
 
@@ -94,10 +94,12 @@ GitHub remplace la clé USB. Tes fichiers y sont stockés en ligne, accessibles 
 
 | Commande | Description |
 |---|---|
-| `nsi git` | Configuration initiale de git et GitHub |
+| `nsi init` | Première mise en route : GitHub, ton dépôt, VSCode |
 | `nsi push` | Sauvegarde et envoie ton travail sur GitHub |
 | `nsi pull` | Récupère la dernière version depuis GitHub |
-| `nsi settings` | Remet la configuration du projet à la version du prof |
+| `nsi reset-config` | Remet la configuration du projet à la version du prof (efface tes `uv add`) |
+| `nsi toggle-config` | Cache ou réaffiche les fichiers de configuration dans VSCode |
+| `nsi dir` | Affiche le chemin de ton dossier de cours |
 | `nsi update` | Met à jour l'outil `nsi` |
 | `nsi install <composant>` | Installe un composant supplémentaire |
 | `nsi remove <composant>` | Désinstalle un composant |
