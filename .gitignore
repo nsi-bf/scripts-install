@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Cache de permissions local a la machine
+.claude/settings.local.json

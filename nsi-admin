@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# nsi-admin — outil côté prof pour préparer les dépôts élèves dans l'organisation
+# GitHub mmarchand-teacher. Usage local uniquement (jamais déployé aux élèves).
+#
+# Pré-requis :
+#   - `gh` installé et authentifié en tant que toi (owner de l'organisation) :
+#       gh auth login
+#   - un dépôt template dans l'organisation, marqué "Template repository"
+#       (voir TEMPLATE_REPO ci-dessous)
+#
+# Usage :
+#   ./nsi-admin <fichier.csv> <nom-de-classe>
+#
+# Le fichier CSV contient une ligne par élève, sans en-tête :
+#   nom,pseudo_github
+#
+# Exemple (1B.csv) :
+#   Dupont Jean,jdupont23
+#   Martin Léa,lmartin23
+#
+# Exécution :
+#   ./nsi-admin 1B.csv "Classe-1B"
+#
+# Pour chaque élève, de façon idempotente (peut être relancé sans risque) :
+#   1. l'invite dans une team "roster" dédiée à la classe (aucun dépôt n'y est
+#      jamais attaché : elle ne sert qu'à l'inviter dans l'organisation et à
+#      le retrouver groupé avec sa classe)
+#   2. crée son dépôt individuel depuis le template, s'il n'existe pas déjà
+#   3. l'ajoute comme collaborateur en écriture sur SON dépôt uniquement
+
+set -euo pipefail
+
+GITHUB_ORG="mmarchand-teacher"
+TEMPLATE_REPO="template-eleve"
+
+usage() {
+    echo "Usage : $0 <fichier.csv> <nom-de-classe>" >&2
+    echo "  fichier.csv    : une ligne par élève, format 'nom,pseudo_github'" >&2
+    echo "  nom-de-classe  : ex. 'Classe-1B'" >&2
+    exit 1
+}
+
+[[ $# -eq 2 ]] || usage
+csv_file="$1"
+class_name="$2"
+
+[[ -f "$csv_file" ]] || { echo "Erreur : fichier introuvable : $csv_file" >&2; exit 1; }
+
+command -v gh &>/dev/null || { echo "Erreur : 'gh' (GitHub CLI) n'est pas installé." >&2; exit 1; }
+gh auth status &>/dev/null || { echo "Erreur : pas authentifié. Lance 'gh auth login' d'abord." >&2; exit 1; }
+
+echo ""
+echo "Organisation cible : $GITHUB_ORG"
+echo "Template            : $GITHUB_ORG/$TEMPLATE_REPO"
+echo "Classe               : $class_name"
+echo ""
+
+gh repo view "$GITHUB_ORG/$TEMPLATE_REPO" &>/dev/null || {
+    echo "Erreur : le dépôt template $GITHUB_ORG/$TEMPLATE_REPO est introuvable." >&2
+    echo "Crée-le d'abord et coche 'Template repository' dans ses Settings." >&2
+    exit 1
+}
+
+# --- team "roster" de la classe (aucun dépôt jamais attaché) ---
+
+team_slug="$(gh api "orgs/$GITHUB_ORG/teams" --paginate --jq ".[] | select(.name==\"$class_name\") | .slug" | head -n1)"
+
+if [[ -z "$team_slug" ]]; then
+    echo "Création de la team '$class_name'..."
+    team_slug="$(gh api -X POST "orgs/$GITHUB_ORG/teams" -f name="$class_name" -f privacy=closed --jq '.slug')"
+else
+    echo "Team '$class_name' déjà existante (slug: $team_slug)."
+fi
+
+# --- boucle élèves ---
+
+while IFS=',' read -r nom pseudo || [[ -n "$nom" ]]; do
+    nom="$(echo "$nom" | xargs)"
+    pseudo="$(echo "$pseudo" | xargs)"
+
+    [[ -z "$nom" || "$nom" == \#* ]] && continue
+    if [[ -z "$pseudo" ]]; then
+        echo "  Ligne ignorée (pas de pseudo GitHub) : $nom" >&2
+        continue
+    fi
+
+    echo ""
+    echo "--- $nom ($pseudo) ---"
+
+    # 1. Invitation dans la team roster de la classe
+    if gh api "orgs/$GITHUB_ORG/teams/$team_slug/memberships/$pseudo" &>/dev/null; then
+        echo "  Déjà dans la team."
+    else
+        gh api -X PUT "orgs/$GITHUB_ORG/teams/$team_slug/memberships/$pseudo" -f role=member >/dev/null
+        echo "  Invité dans la team (l'élève doit accepter l'invitation reçue par email)."
+    fi
+
+    # 2. Dépôt individuel depuis le template
+    if gh repo view "$GITHUB_ORG/$pseudo" &>/dev/null; then
+        echo "  Dépôt $pseudo déjà existant."
+    else
+        gh repo create "$GITHUB_ORG/$pseudo" --private --template "$GITHUB_ORG/$TEMPLATE_REPO" >/dev/null
+        echo "  Dépôt $pseudo créé depuis le template."
+    fi
+
+    # 3. Accès individuel en écriture, restreint à ce seul dépôt
+    if gh api "repos/$GITHUB_ORG/$pseudo/collaborators/$pseudo" &>/dev/null; then
+        echo "  Déjà collaborateur sur son dépôt."
+    else
+        gh api -X PUT "repos/$GITHUB_ORG/$pseudo/collaborators/$pseudo" -f permission=push >/dev/null
+        echo "  Ajouté comme collaborateur (écriture) sur son dépôt."
+    fi
+done < "$csv_file"
+
+echo ""
+echo "Terminé."
