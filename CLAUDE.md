@@ -22,7 +22,7 @@ jeton, l'élève n'en a pas encore.
 
 ## Points d'entrée
 
-**Windows**, dans **PowerShell** (pas `cmd`) :
+**Windows**, dans **PowerShell en tant qu'administrateur** (pas `cmd`) :
 ```
 irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 -OutFile "$env:TEMP\nsi-setup.ps1"; Set-ExecutionPolicy Bypass -Scope Process -Force; & "$env:TEMP\nsi-setup.ps1"
 ```
@@ -44,6 +44,20 @@ curl -fsSL https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.s
 ```
 
 Servis depuis GitHub raw (branche `main`), sans releases à gérer.
+
+**Le script n'élève pas lui-même.** `Start-Process -Verb RunAs` échoue sans
+la moindre invite, sur un « Accès refusé » que rien n'explique, dès que la
+stratégie du poste refuse les élévations (`ConsentPromptBehaviorUser = 0`, ou
+compte standard) ; constaté sur un poste de test le 2026-09-11. Et quand elle
+réussit, elle ouvre une seconde fenêtre, avec son propre journal et sa propre
+sortie à suivre. Quand il manque quelque chose qui exige l'administrateur,
+`Stop-DemanderAdmin` affiche le diagnostic et explique comment rouvrir
+PowerShell en administrateur. Une étape de plus, mais qui se voit, se comprend
+et se recommence.
+
+Au lycée, l'élève ne peut pas être administrateur, et n'en a pas besoin : VSCode
+et WSL y sont déjà. Le script ne réclame donc les droits que s'il lui manque
+vraiment quelque chose.
 
 **PowerShell et pas `cmd`** : depuis `cmd`, le détecteur de menaces de Windows
 refuse la commande (« accès refusé », constaté sur un poste de test le

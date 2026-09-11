@@ -8,11 +8,16 @@ Bienvenue ! Ces instructions te permettent d'installer en quelques minutes tout 
 
 ### Windows
 
-Ouvre **PowerShell** et colle cette commande :
+Ouvre **PowerShell en tant qu'administrateur**, puis colle cette commande :
 
-> Menu Démarrer, tape `powershell`, puis ouvre **Windows PowerShell**.
+> Menu Démarrer, tape `powershell`, **clic droit** sur **Windows PowerShell**,
+> puis **Exécuter en tant qu'administrateur**.
+>
 > Pas l'invite de commandes `cmd` : le détecteur de menaces de Windows y
 > bloque l'installation.
+>
+> Sur un ordinateur du lycée, tu ne pourras pas : lance-la sans être
+> administrateur, tout ce qui en a besoin y est déjà installé.
 
 ```
 irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 -OutFile "$env:TEMP\nsi-setup.ps1"; Set-ExecutionPolicy Bypass -Scope Process -Force; & "$env:TEMP\nsi-setup.ps1"

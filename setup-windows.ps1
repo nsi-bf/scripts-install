@@ -39,11 +39,7 @@ if ([string]::IsNullOrEmpty($Bureau)) { $Bureau = $env:TEMP }
 $LogPath = Join-Path $Bureau "nsi-installation.log"
 try { Start-Transcript -Path $LogPath -Append -Force | Out-Null } catch { }
 
-$SetupUrl   = "https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1"
 $SetupShUrl = "https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.sh"
-# Ou le script se pose quand il faut le relancer eleve. Si on a ete lance
-# depuis un fichier, c'est celui-la qu'on reutilise.
-$ScriptPath = Join-Path $env:TEMP "nsi-setup.ps1"
 $Distro     = "Debian"
 $WslUser    = "padawan"
 $WslPass    = "padawan"
@@ -285,38 +281,35 @@ function Show-Accueil {
     Write-Host ""
 }
 
-# Relance le script élevé et rend la main au processus élevé. Ne revient que si
-# on était déjà administrateur.
-function Request-Admin {
-    if (Test-Admin) { return }
-    try {
-        # On relance un fichier, pas un `irm | iex` : pas de second
-        # telechargement, pas d'execution en memoire, et des erreurs qui
-        # portent un vrai numero de ligne. Si on vient deja d'un fichier, on
-        # reutilise celui-la.
-        $chemin = $ScriptPath
-        if (-not [string]::IsNullOrEmpty($PSCommandPath)) {
-            $chemin = $PSCommandPath
-        } elseif (-not (Test-Path $chemin)) {
-            Invoke-WebRequest -Uri $SetupUrl -OutFile $chemin -UseBasicParsing
-        }
-
-        # -NoExit : sans lui, la fenetre elevee se ferme instantanement si le
-        # script echoue avant son propre try/catch, par exemple sur une erreur
-        # d'analyse. On ne verrait alors rien du tout.
-        Start-Process PowerShell -Verb RunAs `
-            -ArgumentList "-NoExit -ExecutionPolicy Bypass -File `"$chemin`""
-        exit
-    } catch {
-        # Refus de l'UAC, ou compte sans droit d'élévation. On dit laquelle :
-        # le message seul ne laissait rien à corriger.
-        Write-Red ""
-        Write-Red "L'ELEVATION DES PRIVILEGES A ECHOUE."
-        Write-Red "Detail : $($_.Exception.Message)"
-        Show-Diagnostic
-        Stop-VoirLeProf "CET ORDINATEUR N'A PAS TOUT CE QU'IL FAUT, ET JE NE PEUX PAS L'INSTALLER."
-    }
+# Il manque quelque chose qui exige l'administrateur, et on ne l'est pas. On ne
+# tente plus d'elever nous-memes : `Start-Process -Verb RunAs` echoue sans
+# invite, sur un « Acces refuse » que rien n'explique, des que la strategie du
+# poste refuse les elevations. Et quand elle reussit, elle ouvre une seconde
+# fenetre, avec son propre journal et sa propre sortie a suivre.
+#
+# On demande donc a l'eleve de rouvrir PowerShell en administrateur. Une etape
+# de plus, mais qui se voit, se comprend et se recommence.
+function Stop-DemanderAdmin {
+    Show-Diagnostic
+    Write-Red ""
+    Write-Red "CETTE INSTALLATION A BESOIN DES DROITS ADMINISTRATEUR."
+    Write-Red ""
+    Write-Red "Ferme cette fenetre, puis :"
+    Write-Red "  1. menu Demarrer, tape : powershell"
+    Write-Red "  2. clic DROIT sur 'Windows PowerShell'"
+    Write-Red "  3. choisis 'Executer en tant qu'administrateur'"
+    Write-Red "  4. recolle exactement la meme commande"
+    Write-Red ""
+    Write-Red "Si tu ne peux pas (ordinateur du lycee), demande de l'assistance"
+    Write-Red "a ton professeur."
+    Write-Red ""
+    Write-Red "Compte rendu ecrit dans : $LogPath"
+    Write-Red ""
+    try { Stop-Transcript | Out-Null } catch { }
+    Read-Host "Appuie sur entrée pour quitter"
+    exit 1
 }
+
 
 # winget est livré avec Windows 11 et Windows 10 1809+, mais par le paquet App
 # Installer du Microsoft Store, donc absent d'une édition N ou LTSC, d'un
@@ -531,12 +524,10 @@ try {
     # L'élévation d'abord, le mot d'accueil ensuite : dans l'autre ordre,
     # l'élève lit le texte, appuie sur entrée, accepte l'UAC, et retrouve le
     # même texte et la même attente dans la fenêtre élevée.
-    if ($besoinAdmin) {
-        # Dit pourquoi on va demander l'élévation. Quand elle n'était pas
-        # nécessaire, c'est ici qu'on voit laquelle des deux sondes se trompe.
-        Write-Host "Il manque quelque chose cote Windows, je demande les droits administrateur."
-        Show-Diagnostic
-        Request-Admin          # ne revient que si on est déjà administrateur
+    if ($besoinAdmin -and -not (Test-Admin)) {
+        # Le diagnostic est affiché par Stop-DemanderAdmin : si une sonde se
+        # trompait, c'est là qu'on le verrait.
+        Stop-DemanderAdmin
     }
 
     Show-Accueil
