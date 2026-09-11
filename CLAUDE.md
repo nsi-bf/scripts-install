@@ -24,12 +24,19 @@ jeton, l'élève n'en a pas encore.
 
 **Windows**, dans **PowerShell** (pas `cmd`) :
 ```
-irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex
+irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 -OutFile "$env:TEMP\nsi-setup.ps1"; Set-ExecutionPolicy Bypass -Scope Process -Force; & "$env:TEMP\nsi-setup.ps1"
 ```
 
-Pas de `powershell -ExecutionPolicy Bypass -c` devant : on est déjà dans
-PowerShell, et la politique d'exécution ne s'applique pas à `iex`, qui reçoit
-une chaîne et non un fichier. Moins de caractères à coller pour un débutant.
+**Le script est écrit sur le disque puis exécuté**, au lieu d'être passé à
+`iex`. Exécuter en mémoire du code téléchargé est le motif des chargeurs de
+logiciels malveillants, donc ce que l'AMSI surveille en premier ; un fichier
+posé puis lancé est analysé comme n'importe quel fichier. En prime, les erreurs
+portent un vrai numéro de ligne, et `Request-Admin` relance ce fichier au lieu
+de retélécharger.
+
+`Set-ExecutionPolicy -Scope Process` est indispensable et n'exige pas
+l'administrateur : la politique `LocalMachine` est `Undefined` sur un Windows
+client, donc `Restricted` en pratique, et un `.ps1` ne s'exécuterait pas.
 
 **Mac / Linux** :
 ```

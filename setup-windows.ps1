@@ -1,11 +1,20 @@
 # Amorçage Windows de l'environnement NSI.
 #
-#   irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex
+#   irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 -OutFile "$env:TEMP\nsi-setup.ps1"; Set-ExecutionPolicy Bypass -Scope Process -Force; & "$env:TEMP\nsi-setup.ps1"
 #
 # A coller dans PowerShell, pas dans cmd : depuis cmd, le detecteur de menaces
-# de Windows refuse la commande. L'execution en memoire de code telecharge est
-# le motif des chargeurs de logiciels malveillants, et le processus parent
-# entre dans l'heuristique.
+# de Windows refuse la commande.
+#
+# Le script est ecrit sur le disque puis execute, plutot que passe a `iex`.
+# Executer en memoire du code telecharge est le motif des chargeurs de
+# logiciels malveillants, donc ce que l'AMSI surveille en premier ; un fichier
+# pose puis lance est analyse comme n'importe quel fichier. Accessoirement, les
+# erreurs portent alors un vrai numero de ligne, et l'elevation reutilise le
+# fichier au lieu de retelecharger.
+#
+# `Set-ExecutionPolicy -Scope Process` n'exige pas l'administrateur, et sans
+# elle un .ps1 ne s'executerait pas : la politique LocalMachine est Undefined
+# sur un Windows client, donc Restricted en pratique.
 #
 # Rôle unique : fabriquer une machine Linux utilisable, puis passer la main à
 # setup.sh. Ce script n'installe aucun outil pédagogique : ni nsi, ni uv, ni
@@ -32,6 +41,9 @@ try { Start-Transcript -Path $LogPath -Append -Force | Out-Null } catch { }
 
 $SetupUrl   = "https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1"
 $SetupShUrl = "https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.sh"
+# Ou le script se pose quand il faut le relancer eleve. Si on a ete lance
+# depuis un fichier, c'est celui-la qu'on reutilise.
+$ScriptPath = Join-Path $env:TEMP "nsi-setup.ps1"
 $Distro     = "Debian"
 $WslUser    = "padawan"
 $WslPass    = "padawan"
@@ -278,11 +290,22 @@ function Show-Accueil {
 function Request-Admin {
     if (Test-Admin) { return }
     try {
+        # On relance un fichier, pas un `irm | iex` : pas de second
+        # telechargement, pas d'execution en memoire, et des erreurs qui
+        # portent un vrai numero de ligne. Si on vient deja d'un fichier, on
+        # reutilise celui-la.
+        $chemin = $ScriptPath
+        if (-not [string]::IsNullOrEmpty($PSCommandPath)) {
+            $chemin = $PSCommandPath
+        } elseif (-not (Test-Path $chemin)) {
+            Invoke-WebRequest -Uri $SetupUrl -OutFile $chemin -UseBasicParsing
+        }
+
         # -NoExit : sans lui, la fenetre elevee se ferme instantanement si le
         # script echoue avant son propre try/catch, par exemple sur une erreur
         # d'analyse. On ne verrait alors rien du tout.
         Start-Process PowerShell -Verb RunAs `
-            -ArgumentList "-NoExit -ExecutionPolicy Bypass -Command `"irm '$SetupUrl' | iex`""
+            -ArgumentList "-NoExit -ExecutionPolicy Bypass -File `"$chemin`""
         exit
     } catch {
         # Refus de l'UAC, ou compte sans droit d'élévation. On dit laquelle :

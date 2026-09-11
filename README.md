@@ -15,7 +15,7 @@ Ouvre **PowerShell** et colle cette commande :
 > bloque l'installation.
 
 ```
-irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex
+irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 -OutFile "$env:TEMP\nsi-setup.ps1"; Set-ExecutionPolicy Bypass -Scope Process -Force; & "$env:TEMP\nsi-setup.ps1"
 ```
 
 > Si l'installation te demande de redémarrer, fais-le puis relance exactement la même commande.
