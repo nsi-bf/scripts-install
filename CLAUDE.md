@@ -268,6 +268,16 @@ Script shell unique, auto-contenu.
 - Installé dans `~/.local/bin/nsi` (`INSTALL_PATH`). Ni son installation ni sa
   mise à jour n'exigent `sudo`. Se réinstalle tout seul s'il est lancé depuis
   un autre chemin.
+- **Met `~/.local/bin` dans son propre PATH dès le départ.** C'est là qu'il
+  installe `uv` et lui-même, mais un shell ordinaire ne l'a pas : `wsl -- bash
+  -c` et le terminal de VSCode donnent `/usr/local/bin:/usr/bin:/bin:/sbin` et
+  rien d'autre, seul un shell de connexion lit `~/.profile`. `uv sync`
+  échouait alors sur « uv: command not found » alors qu'`uv` était installé.
+- `install_uv` impose `UV_INSTALL_DIR="$HOME/.local/bin"` : l'installeur essaie
+  sinon `$XDG_BIN_HOME`, puis `$XDG_DATA_HOME/../bin`, et `uv` finirait ailleurs
+  que là où `nsi` le cherche.
+- `exiger_uv` précède chaque `uv sync` : « uv: command not found » ne dit pas
+  quoi faire, « relance `nsi install base` » si.
 - `sudo` n'est employé que pour les paquets système sans alternative
   utilisateur raisonnable : `apt`/`dnf`, Erlang, `build-essential`, `gdb`,
   PostgreSQL, les dépôts `gh` et VSCode.

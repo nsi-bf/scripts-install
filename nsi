@@ -18,6 +18,18 @@ INSTALL_PATH="$HOME/.local/bin/nsi"
 # recalculer demanderait un appel à l'API GitHub, donc du réseau et une
 # authentification, à chaque `nsi push`. On l'écrit donc une fois, dans
 # `nsi init`, et les autres commandes le relisent.
+# nsi installe des outils dans ~/.local/bin (uv, et lui-meme). Un shell de
+# connexion l'a dans son PATH via ~/.profile, mais pas un shell ordinaire :
+# `wsl -- bash -c` et le terminal de VSCode donnent
+# /usr/local/bin:/usr/bin:/bin:/sbin et rien d'autre. `uv sync` echouait alors
+# sur « uv: command not found » alors qu'uv etait bien installe. nsi regarde
+# donc toujours la, sans dependre de la facon dont on l'a lance.
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) PATH="$HOME/.local/bin:$PATH" ;;
+esac
+export PATH
+
 ETAT_DIR="$HOME/.config/nsi"
 ETAT_DOSSIER="$ETAT_DIR/dossier"
 
@@ -111,9 +123,11 @@ remove_git() { pkg_remove git; }
 
 install_uv() {
     command -v uv &>/dev/null && return 0
-    # Sans UV_INSTALL_DIR ni sudo, l'installeur retombe de lui-même sur
-    # $HOME/.local/bin, déjà présent dans le PATH via le ~/.profile Debian.
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    # Destination imposée plutôt que laissée au hasard : l'installeur essaie
+    # $XDG_BIN_HOME, puis $XDG_DATA_HOME/../bin, puis $HOME/.local/bin. Les
+    # deux premières dépendent de variables qu'on ne contrôle pas, et uv
+    # finirait ailleurs que là où nsi le cherche.
+    UV_INSTALL_DIR="$HOME/.local/bin" curl -LsSf https://astral.sh/uv/install.sh | sh
 }
 
 remove_uv() {
@@ -485,6 +499,15 @@ print("Fichiers " + ("masqués" if new_val else "affichés") + " dans l'Explorer
 EOF
 }
 
+# `uv sync` sur un uv absent donne « uv: command not found », qui ne dit pas
+# quoi faire. On le dit.
+exiger_uv() {
+    command -v uv &>/dev/null && return 0
+    echo "Erreur : uv est introuvable." >&2
+    echo "Relance l'installation des outils de base : nsi install base" >&2
+    exit 1
+}
+
 # --- settings ---
 
 cmd_reset_config() {
@@ -495,6 +518,7 @@ cmd_reset_config() {
         gh api "repos/$GITHUB_ORG/$TEMPLATE_REPO/contents/$f" \
             -H "Accept: application/vnd.github.raw" -o "$f"
     done
+    exiger_uv
     uv sync
 
     # Couleurs neutralisées hors terminal (pipe, fichier, journal).
@@ -719,6 +743,7 @@ cmd_init() {
     # template, dont le dépôt de l'élève est issu. On n'écrase jamais son
     # travail ici ; c'est `nsi reset-config` qui remet ces fichiers à neuf.
     cd "$dossier"
+    exiger_uv
     uv sync
 
     # Pas d'ouverture de VSCode ici : lancer un éditeur est une commodité
