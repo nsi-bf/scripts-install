@@ -41,14 +41,17 @@ Idempotent. Ne connaît **aucun** outil pédagogique : ni `nsi`, ni `uv`, ni gle
 1. Installe VSCode via `winget` + l'extension `ms-vscode-remote.remote-wsl`
 2. Vérifie les fonctionnalités Windows de WSL2 ; s'il en manque, affiche en
    ROUGE de redémarrer et de relancer la commande, puis s'arrête
-3. Installe WSL Debian (`wsl --install -d Debian`)
-4. Crée l'utilisateur `padawan` / `padawan`, groupe `sudo`
-5. Pose un `sudoers.d` NOPASSWD temporaire (l'installation qui suit tourne sans
+3. Vérifie que `wsl.exe` existe, et s'arrête en ROUGE sinon (Windows trop
+   ancien, ou installation abîmée) ; il est résolu par chemin absolu, pas par
+   le PATH, un PowerShell 32 bits étant redirigé vers `SysWOW64` où il n'est pas
+4. Installe WSL Debian (`wsl --install -d Debian`)
+5. Crée l'utilisateur `padawan` / `padawan`, groupe `sudo`
+6. Pose un `sudoers.d` NOPASSWD temporaire (l'installation qui suit tourne sans
    terminal, personne ne pourrait taper un mot de passe), installe `curl`,
    appelle `setup.sh` dans WSL, puis révoque le NOPASSWD
-6. Définit `padawan` comme utilisateur par défaut (`/etc/wsl.conf` + clé de
+7. Définit `padawan` comme utilisateur par défaut (`/etc/wsl.conf` + clé de
    registre `DefaultUid`)
-7. Ouvre une console Debian interactive qui lance `nsi git`, puis laisse un
+8. Ouvre une console Debian interactive qui lance `nsi git`, puis laisse un
    shell (`exec bash`)
 
 Attend que Windows Update ait fini avant DISM et `wsl --install` : sans ça
