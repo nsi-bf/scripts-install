@@ -511,8 +511,20 @@ vérifié, la boucle rend la main au lieu de s'emballer.
 ### `nsi reset-config`
 
 Retélécharge les fichiers de configuration depuis `nsi-bf/template-eleves` et
-les écrase. Commande explicite, avec avertissement à l'élève : elle réinitialise
-`pyproject.toml`, donc ses `uv add`.
+les écrase. Commande explicite, avec avertissement à l'élève : elle
+réinitialise `pyproject.toml`, donc ses `uv add`.
+
+**Elle ne réclame que ce que le modèle contient réellement.** `TEMPLATE_FICHIERS`
+dit ce qui *peut* être repris, pas ce qui doit exister : le contenu du modèle
+est tenu à part, et `nsi` n'a pas à savoir ce qui s'y trouve aujourd'hui. La
+liste est donc intersectée avec l'arbre du dépôt-modèle, et ce qui manque est
+signalé puis ignoré. Sans ce filtre, un fichier absent faisait échouer `gh api`
+en 404 et, sous `set -euo pipefail`, tuait la commande.
+
+**`gh api` n'a pas de drapeau `-o`** (« unknown shorthand flag: 'o' in -o ») :
+le fichier s'écrit par redirection. Cette commande n'avait donc jamais pu
+fonctionner, comme la recherche d'équipe avant elle avec son `--arg`. Les deux
+fois, `gh api` s'est vu prêter des options qu'il n'a pas.
 
 ### `nsi push` / `nsi pull`
 

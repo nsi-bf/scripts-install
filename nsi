@@ -512,12 +512,36 @@ exiger_uv() {
 
 cmd_reset_config() {
     aller_dans_le_depot
-    local f
-    mkdir -p .vscode
+    local f present manquants=0
+
+    # On ne réclame que ce que le modèle contient réellement. La liste
+    # TEMPLATE_FICHIERS dit ce qui *peut* être repris, pas ce qui doit exister :
+    # le contenu du modèle est tenu à part, et `nsi` n'a pas à savoir ce qui s'y
+    # trouve aujourd'hui. Sans ce filtre, un fichier absent faisait échouer
+    # `gh api` en 404 et, sous `set -euo pipefail`, tuait la commande entière.
+    present="$(gh api "repos/$GITHUB_ORG/$TEMPLATE_REPO/git/trees/HEAD?recursive=1" \
+        --jq '.tree[] | select(.type=="blob") | .path')"
+
     for f in "${TEMPLATE_FICHIERS[@]}"; do
+        if ! grep -qxF "$f" <<< "$present"; then
+            echo "  (absent du modèle, ignoré : $f)"
+            manquants=$((manquants + 1))
+            continue
+        fi
+        # Redirection, pas `-o` : `gh api` n'a pas ce drapeau, il n'apparaît
+        # nulle part dans `gh api --help`. L'appel echouait sur « unknown flag:
+        # -o », ce qui, sous `set -euo pipefail`, tuait la commande.
+        mkdir -p "$(dirname "$f")"
         gh api "repos/$GITHUB_ORG/$TEMPLATE_REPO/contents/$f" \
-            -H "Accept: application/vnd.github.raw" -o "$f"
+            -H "Accept: application/vnd.github.raw" > "$f"
     done
+
+    if (( manquants == ${#TEMPLATE_FICHIERS[@]} )); then
+        echo "Erreur : le modèle $GITHUB_ORG/$TEMPLATE_REPO ne contient aucun" >&2
+        echo "des fichiers attendus. Préviens ton prof." >&2
+        exit 1
+    fi
+
     exiger_uv
     uv sync
 
