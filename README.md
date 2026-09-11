@@ -59,7 +59,7 @@ nsi init
 
 Il te sera demandé un **token d'accès personnel** (une sorte de mot de passe sécurisé). Ton dépôt et ton identité git sont retrouvés automatiquement à partir de ce token : rien d'autre à taper.
 
-Pour créer ton token : va sur [https://github.com/settings/tokens](https://github.com/settings/tokens), clique sur **Generate new token (classic)**, et coche la portée **`repo`**.
+Pour créer ton token : va sur [https://github.com/settings/tokens](https://github.com/settings/tokens), clique sur **Generate new token (classic)**, et coche les trois portées **`repo`**, **`read:org`** et **`gist`**.
 
 > **Attention : le token ne s'affiche qu'une seule fois, copie-le immédiatement.** Garde-le en lieu sûr : `nsi init` le redemande à chaque fois. Si tu l'as perdu, révoque-le et crée-en un nouveau.
 

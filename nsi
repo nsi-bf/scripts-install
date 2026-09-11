@@ -607,7 +607,8 @@ cmd_init() {
     echo "Pour en créer un :"
     echo "  1. Va sur https://github.com/settings/tokens"
     echo "  2. Clique sur 'Generate new token (classic)'"
-    echo "  3. Donne-lui un nom (ex: 'NSI') et coche la portée 'repo'"
+    echo "  3. Donne-lui un nom (ex: 'NSI') et coche les portées 'repo',"
+    echo "     'read:org' et 'gist'"
     echo "  4. Clique sur 'Generate token' et copie-le IMMEDIATEMENT
      ATTENTION : le token ne s'affiche qu'une seule fois, il sera impossible de le retrouver ensuite !"
     echo ""
@@ -632,7 +633,14 @@ cmd_init() {
     # était créée un peu en avance ou en retard sur ce calendrier, les noms
     # d'équipe ne se trient pas (une vieille "Term2425" ne finit même pas par
     # une année), et l'appel à /user/teams imposait la portée `read:org` au
-    # jeton, une case de plus à cocher pour un débutant.
+    # jeton pour nos propres besoins.
+    #
+    # `read:org` reste pourtant à cocher, mais pour une autre raison :
+    # `gh auth login --with-token` l'exige pour lui-même, avec `repo` et
+    # `gist`. Son aide le dit : « The minimum required scopes for the token
+    # are: repo, read:org, and gist. » Un jeton sans elle est refusé par gh sur
+    # « missing required scope read:org ». Ne pas la retirer de la consigne en
+    # croyant qu'elle ne sert plus.
     #
     # On liste donc ses dépôts. La documentation de `affiliation` est explicite
     # sur ce qu'on y trouve : `collaborator` désigne « repositories that the

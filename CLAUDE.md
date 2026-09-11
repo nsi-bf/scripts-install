@@ -369,8 +369,15 @@ modification d'un côté est à répercuter à la main de l'autre.
 
 ### `nsi init`
 
-Interdit à root. Demande un seul champ : un token d'accès personnel, portée
-**`repo`** seule.
+Interdit à root. Demande un seul champ : un token d'accès personnel, portées
+**`repo`**, **`read:org`** et **`gist`**.
+
+Ces trois-là ne viennent pas de nos appels, qui n'ont besoin que de `repo`,
+mais de **`gh auth login --with-token`**, dont l'aide dit : « The minimum
+required scopes for the token are: `repo`, `read:org`, and `gist`. » Un jeton
+sans `read:org` est refusé par `gh` sur « missing required scope read:org »,
+constaté le 2026-09-11. Ne pas les retirer de la consigne en croyant qu'elles
+ne servent plus depuis l'abandon de `/user/teams`.
 
 Ne demande ni classe ni nom de dépôt. Il lit le pseudo (`gh api user`), liste
 les dépôts auxquels l'élève a accès (`gh api /user/repos`), garde ceux qui
@@ -385,8 +392,9 @@ cours, avec bascule au 1ᵉʳ août, et cherchait une équipe finissant par
 `_<année>` via `/user/teams`. Trois défauts : échec net si la classe était
 créée en avance ou en retard sur ce calendrier, noms d'équipe non triables (une
 vieille `Term2425` ne finit même pas par une année), et la portée `read:org`
-imposée au jeton, c'était le seul appel qui la réclamait. La date de création
-des dépôts, elle, tranche sans convention supplémentaire.
+imposée au jeton pour nos propres besoins. La date de création des dépôts,
+elle, tranche sans convention supplémentaire. `read:org` reste néanmoins à
+cocher, `gh` l'exigeant pour lui-même (voir ci-dessus).
 
 **Le filtrage se fait en shell, pas en jq.** `gh api --jq` **n'accepte pas
 `--arg`** (aucun dans `gh api --help`), donc on ne peut pas lui passer
