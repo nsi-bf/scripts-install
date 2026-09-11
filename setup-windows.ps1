@@ -530,7 +530,7 @@ function Open-ConsoleDebian {
     # /dev/tty ouvrable, même avec stdin branché sur le tuyau de curl (mesuré
     # le 2026-09-11). Sans cette garde, l'élève se voyait redemander son jeton
     # une seconde fois, juste après l'ouverture de VSCode.
-    Start-Process $script:Wsl -ArgumentList "-d $Distro -u $WslUser -- bash -lc `"cd ~ && { nsi dir >/dev/null 2>&1 || nsi init; } && code `$(nsi dir); exec bash -l`""
+    Start-Process $script:Wsl -ArgumentList "-d $Distro -u $WslUser -- bash -lc `"cd ~ && { nsi dir >/dev/null 2>&1 || nsi init; } && { code \`"`$(nsi dir)\`" || echo 'VSCode n a pas pu s ouvrir, retape : code \`"'`$(nsi dir)'\`"'; }; exec bash -l`""
 }
 
 

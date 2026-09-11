@@ -460,6 +460,14 @@ demanderait un appel à l'API GitHub, réseau et authentification, à chaque
   (`code "$(nsi dir)"`) plutôt que de lire `~/.config/nsi/dossier`, dont le
   chemin et le format ne regardent que `nsi`.
 
+**Ouvrir VSCode n'est jamais fatal.** Le tout premier `code <dossier>` lancé
+depuis WSL déclenche le téléchargement du serveur VSCode dans la distribution,
+par `wslCode.sh` : pendant cette installation, l'appel peut échouer une fois
+(« Exec format error » sur `Code.exe`), puis fonctionner ensuite. Constaté le
+2026-09-11. `setup.sh` comme `Open-ConsoleDebian` rattrapent donc l'échec et
+disent quoi retaper : l'environnement est installé et le dépôt cloné de toute
+façon, et un `set -e` sur cette ligne tuerait tout à la dernière étape.
+
 **Ouvrir VSCode n'appartient qu'aux scripts d'amorçage**, pas à `nsi init` :
 lancer un éditeur est une commodité de première mise en route, pas le travail
 d'une commande qui configure et clone. `setup.sh` le fait sur Mac et Linux,

@@ -173,7 +173,18 @@ if (exec </dev/tty) 2>/dev/null; then
         if command -v code &>/dev/null; then
             echo ""
             echo "Ouverture de VSCode..."
-            code "$dossier"
+            # Jamais fatal. Ouvrir l'editeur est un confort de fin de parcours,
+            # pas une etape : l'environnement est installe et le depot cloné,
+            # quoi qu'il arrive ici. Et le tout premier `code` lancé depuis WSL
+            # déclenche le téléchargement du serveur VSCode dans la
+            # distribution : pendant cette installation, l'appel peut échouer
+            # une fois ("Exec format error"), puis marcher ensuite.
+            if ! code "$dossier"; then
+                echo ""
+                echo "VSCode n'a pas pu s'ouvrir tout de suite."
+                echo "Ce n'est pas grave : tout est installé. Retape simplement"
+                echo "  code $dossier"
+            fi
         else
             echo ""
             echo "Ouvre VSCode, puis ouvre ce dossier :  $dossier"
