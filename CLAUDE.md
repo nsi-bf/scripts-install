@@ -460,6 +460,24 @@ demanderait un appel à l'API GitHub, réseau et authentification, à chaque
   (`code "$(nsi dir)"`) plutôt que de lire `~/.config/nsi/dossier`, dont le
   chemin et le format ne regardent que `nsi`.
 
+> **TODO : idempotence de l'ouverture de VSCode en fin d'installation Windows.**
+>
+> Sur le parcours Windows, **deux appels à `code` ont lieu à chaque exécution** :
+> `setup.sh` en ouvre un (il trouve `/dev/tty`, donc il prend sa branche
+> interactive), puis `Open-ConsoleDebian` en ouvre un second. Seul `nsi init`
+> est gardé par `nsi dir`, pas l'ouverture de l'éditeur.
+>
+> L'effet visible est faible, `code` sur un dossier déjà ouvert remet la
+> fenêtre au premier plan plutôt que d'en créer une seconde. Mais c'est un
+> appel de trop, et c'est probablement le premier des deux qui tombe pendant
+> l'installation du serveur VSCode, d'où le « Exec format error » observé.
+>
+> À trancher : qui ouvre VSCode sur ce parcours. Trois pistes, aucune testée.
+> Laisser `setup.sh` le faire et retirer l'appel de la console finale. Ou
+> l'inverse, et rendre `setup.sh` muet quand il tourne sous WSL. Ou déplacer
+> l'ouverture côté PowerShell avec `code --remote wsl+Debian <dossier>`, qui ne
+> traverse ni script Linux ni interop.
+
 **Ouvrir VSCode n'est jamais fatal.** Le tout premier `code <dossier>` lancé
 depuis WSL déclenche le téléchargement du serveur VSCode dans la distribution,
 par `wslCode.sh` : pendant cette installation, l'appel peut échouer une fois
