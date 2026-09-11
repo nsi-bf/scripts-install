@@ -21,8 +21,17 @@ Rôle unique : fabriquer une machine Linux utilisable, puis passer la main.
 - Pose un `sudoers.d` NOPASSWD temporaire, le révoque après.
 - Appelle `setup.sh` dans WSL.
 - Définit `padawan` comme utilisateur par défaut (`wsl.conf` + registre).
+- Ouvre une console Debian qui enchaîne sur `nsi git`, puis laisse un shell.
 
-Ne connaît **aucun** outil pédagogique : ni `nsi`, ni `uv`, ni gleam.
+N'**installe** aucun outil pédagogique : ni `nsi`, ni `uv`, ni gleam. Tout ce
+qui s'installe côté Linux passe par `setup.sh`.
+
+La seule exception est la dernière ligne, qui nomme `nsi git` pour enchaîner.
+C'est assumé : le message de `setup.sh` a défilé dans la fenêtre PowerShell, et
+la console qui s'ouvre est un shell neuf. Sans cette ligne l'élève se retrouve
+devant un prompt nu, sans rien lui dire quoi taper. Une commande à ne pas
+saisir vaut mieux qu'une frontière pure : la règle porte sur qui installe quoi,
+pas sur qui prononce un nom.
 
 ## setup.sh — WSL, Linux, macOS
 
@@ -64,16 +73,23 @@ Linux, c'est cette ligne qu'il faudrait changer, pas les scripts.
 
 ## Fichiers de configuration élève
 
-`settings.json`, `extensions.json`, `tasks.json`, `pyproject.toml`,
-`.gitignore`.
+`settings.json`, `extensions.json`, `pyproject.toml`, `.gitignore`.
 
-Aujourd'hui récupérés par `curl` dans `cmd_git` et `cmd_settings`, ce qui
-**écrase** le travail de l'élève à chaque appel.
+Pas de `tasks.json` : il portait un `nsi pull` automatique à l'ouverture du
+dépôt. Un geste que l'élève n'a pas demandé, qu'il ne voit pas passer et qu'il
+ne saurait pas défaire — `nsi pull` est une commande qu'il tape.
 
-Piste retenue : les déplacer dans le template de dépôt de l'organisation
-`nsi-bf`, et créer les dépôts élèves à partir de ce template.
+Ils ne sont plus dans ce dépôt (fait le 2026-09-11). Ils vivent dans le
+dépôt-modèle `nsi-bf/template-eleves`, dont chaque dépôt d'élève est engendré :
+c'est la seule source.
 
-Contrepartie assumée : un template est un instantané, il ne propage rien aux
+`nsi git` ne déploie donc plus rien — il clone, `uv sync`, ouvre VS Code. Il
+n'écrase plus le travail de l'élève à chaque appel, ce qu'il faisait quand il
+tirait ces fichiers par `curl`.
+
+Contrepartie assumée : un modèle est un instantané, GitHub ne propage rien aux
 dépôts déjà créés. On échange « corriger tout le monde d'un coup » contre
-« ne jamais écraser le travail d'un élève ». `nsi settings` peut rester comme
-commande explicite pour les cas où la propagation est voulue.
+« ne jamais écraser le travail d'un élève ». Deux commandes explicites le
+rattrapent quand la propagation est voulue : `nsi settings` côté élève, et
+`equipe_github.py --rafraichir` côté prof, qui réécrit les fichiers tenus dans
+tous les dépôts d'une classe.

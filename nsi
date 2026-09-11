@@ -8,7 +8,7 @@ GITHUB_RAW_URL="https://raw.githubusercontent.com/nsi-bf/scripts-install/main/ns
 # l'élève, jamais par curl qui n'en a pas.
 TEMPLATE_REPO="template-eleves"
 TEMPLATE_FICHIERS=(.vscode/settings.json .vscode/extensions.json
-                   .vscode/tasks.json pyproject.toml .gitignore)
+                   pyproject.toml .gitignore)
 # nsi vit chez l'utilisateur : ni son installation ni sa mise à jour
 # n'exigent sudo. ~/.local/bin passe avant /usr/local/bin dans le PATH.
 INSTALL_PATH="$HOME/.local/bin/nsi"

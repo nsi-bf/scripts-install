@@ -1,7 +1,6 @@
 * text=auto
 
 nsi text eol=lf
-nsi-admin text eol=lf
 *.sh text eol=lf
 *.ps1 text eol=crlf
 *.json text eol=lf

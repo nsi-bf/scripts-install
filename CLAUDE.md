@@ -1,186 +1,204 @@
 # Objectif
 
-Un élève dispose de deux commandes à copier-coller dans un terminal pour accéder à un environnement de développement complet.
+Un élève dispose d'**une commande** à copier-coller dans un terminal pour
+obtenir un environnement de développement complet, puis d'une seconde
+(`nsi git`) pour être relié à son dépôt.
 
-Ce sont de jeunes élèves débutants, il faut que ça soit facile d'utilisation et idempotent.
+Ce sont de jeunes élèves débutants : tout doit être simple et idempotent.
 
-## Commandes de bootstrap
+**[`ARCHI.md`](ARCHI.md) fait foi.** En cas de contradiction entre ce fichier,
+le code et ARCHI.md, c'est ARCHI.md qui tranche et les autres qui se corrigent.
+
+## Les trois artefacts
+
+| Fichier | Portée | Rôle |
+|---|---|---|
+| [`setup-windows.ps1`](setup-windows.ps1) | Windows | fabriquer une machine Linux utilisable, puis passer la main |
+| [`setup.sh`](setup.sh) | WSL, Linux, macOS | poser `nsi` et lancer `nsi install base` |
+| [`nsi`](nsi) | WSL, Linux, macOS | l'outil : composants, git, mise à jour |
+
+Ils vivent dans un dépôt **public** : l'amorçage se fait par `curl` sans aucun
+jeton, l'élève n'en a pas encore.
+
+## Points d'entrée
 
 **Windows** (cmd.exe ou PowerShell) :
 ```
-powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex"
 ```
 
 **Mac / Linux** :
 ```
-curl -fsSL https://raw.githubusercontent.com/nsi-bf/scripts-install/main/nsi | bash -s -- install base
+curl -fsSL https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.sh | bash
 ```
 
-Les scripts sont servis depuis GitHub raw (branche main), sans releases à gérer.
+Servis depuis GitHub raw (branche `main`), sans releases à gérer.
 
-## OS
+## setup-windows.ps1
 
-### Windows
+Idempotent. Ne connaît **aucun** outil pédagogique : ni `nsi`, ni `uv`, ni gleam.
 
-`setup.ps1` est un script PowerShell idempotent qui :
+1. Installe VSCode via `winget` + l'extension `ms-vscode-remote.remote-wsl`
+2. Vérifie les fonctionnalités Windows de WSL2 ; s'il en manque, affiche en
+   ROUGE de redémarrer et de relancer la commande, puis s'arrête
+3. Installe WSL Debian (`wsl --install -d Debian`)
+4. Crée l'utilisateur `padawan` / `padawan`, groupe `sudo`
+5. Pose un `sudoers.d` NOPASSWD temporaire (l'installation qui suit tourne sans
+   terminal, personne ne pourrait taper un mot de passe), installe `curl`,
+   appelle `setup.sh` dans WSL, puis révoque le NOPASSWD
+6. Définit `padawan` comme utilisateur par défaut (`/etc/wsl.conf` + clé de
+   registre `DefaultUid`)
+7. Ouvre une console Debian interactive qui lance `nsi git`, puis laisse un
+   shell (`exec bash`)
 
-1. Installe VSCode via `winget` + extension `ms-vscode-remote.remote-wsl`
-2. Vérifie que WSL2 est actif ; si des fonctionnalités manquent, affiche un message en ROUGE demandant de redémarrer et de relancer la commande, puis s'arrête
-3. Installe WSL Debian : `wsl --install -d Debian`
-4. Configure l'utilisateur `padawan` / `padawan` en ligne de commande
-5. Accorde temporairement le sudo sans mot de passe (nécessaire pour un appel non interactif, sans terminal pour taper un mot de passe), puis installe les outils via `nsi install base`, et révoque le sudo sans mot de passe
-6. Définit `padawan` comme utilisateur par défaut (via `/etc/wsl.conf` + clé de registre `DefaultUid`)
-7. Ouvre une console Debian interactive qui lance automatiquement `nsi git`, puis laisse un shell interactif (`exec bash`) une fois la configuration terminée
+Attend que Windows Update ait fini avant DISM et `wsl --install` : sans ça
+l'élève croit le script figé pendant dix minutes.
 
-### Linux / Mac
+## setup.sh
 
-`nsi` est un script shell unique auto-contenu qui :
+Identique sur les trois plateformes, aucune condition à écrire.
 
-- Détecte l'OS (apt / dnf / brew)
-- Détecte WSL
-- Est idempotent (vérifie avant d'agir)
-- Gère install et remove par composant
-- Se met à jour via `nsi update` (curl + tee + exit 0 immédiat pour éviter la relecture du fichier remplacé)
-- **Ne s'invoque jamais avec `sudo` en tête** (`nsi install base`, pas `sudo nsi install base`) : chaque opération qui a besoin de root l'appelle elle-même en interne (`sudo apt-get`/`dnf`/écritures sous `/usr/local`…), jamais les chemins Homebrew, qui refusent d'être lancés en root. Sur macOS, `nsi` s'arrête et le dit si on le lance quand même avec `sudo` — sinon Homebrew casserait en silence.
+- Installe `curl` s'il est absent (seul paquet système qu'il pose)
+- Télécharge `nsi` dans `~/.local/bin`
+- Lance `nsi install base`
+- Indique `nsi git` comme étape suivante
 
-Il est téléchargé dans `/usr/local/bin` et rendu exécutable.
+## nsi
+
+Script shell unique, auto-contenu.
+
+- Détecte l'OS (apt / dnf / brew) et WSL
+- Idempotent : vérifie avant d'agir
+- Installé dans `~/.local/bin/nsi` (`INSTALL_PATH`). Ni son installation ni sa
+  mise à jour n'exigent `sudo`. Se réinstalle tout seul s'il est lancé depuis
+  un autre chemin.
+- `sudo` n'est employé que pour les paquets système sans alternative
+  utilisateur raisonnable : `apt`/`dnf`, Erlang, `build-essential`, `gdb`,
+  PostgreSQL, les dépôts `gh` et VSCode.
+- **Ne s'invoque jamais avec `sudo` en tête** (`nsi install base`, pas
+  `sudo nsi install base`). Sur macOS il s'arrête et le dit : Homebrew refuse
+  d'être lancé en root et casserait en silence.
+- `nsi update` retélécharge le script, remplace `$INSTALL_PATH` et termine
+  immédiatement (`exit 0`) — il ne faut pas relire un fichier qu'on remplace.
+
+### VSCode : la frontière
+
+| Plateforme | Qui l'installe |
+|---|---|
+| WSL | `setup-windows.ps1`, côté Windows |
+| Linux / macOS natif | `nsi`, via `install_vscode` |
+
+`install_vscode` commence par `is_wsl && return 0`. C'est le seul endroit qui
+porte cette décision.
 
 ## Composants
 
 ### base
-- vscode (ignoré si WSL — VSCode est déjà installé côté Windows)
 - git
-- uv (installé dans `/usr/local/bin` via `UV_INSTALL_DIR`)
+- uv
 - graphviz
 - gh-cli
+- vscode (ignoré sous WSL)
 
 ### autres composants (installables individuellement)
 - `gleam` — Gleam + Erlang
-- `postgresql` — configuration développeur sans sécurité, avec superuser `dev`/`dev`
+- `postgresql` — configuration développeur sans sécurité, superuser `dev`/`dev`
 - `openjdk` — JDK complet
 - `nasm` — assembleur x86
-- `rust` — Rust via rustup, installé dans `/usr/local/rustup` et `/usr/local/cargo` (accessible à tous les utilisateurs), binaires symlinkés dans `/usr/local/bin`
+- `rust` — via rustup, dans `/usr/local/rustup` et `/usr/local/cargo`
+  (accessible à tous les utilisateurs), binaires symlinkés dans `/usr/local/bin`
 - `prolog` — SWI-Prolog (`swipl`)
-- `c` — GCC/G++/Make/GDB (`build-essential gdb` sur Debian, `gcc gcc-c++ make gdb` sur Fedora, Xcode CLT + `gdb` sur macOS)
+- `c` — GCC/G++/Make/GDB (`build-essential gdb` sur Debian, `gcc gcc-c++ make
+  gdb` sur Fedora, Xcode CLT + `gdb` sur macOS)
 
-## Interface nsi
+## Interface
 
 ```
-nsi install base
-nsi remove base
-nsi install gleam
-nsi remove gleam
-# etc.
+nsi install <composant>
+nsi remove <composant>
 nsi update
+nsi git         # configuration initiale de git et GitHub
+nsi push        # commit horodaté + push
+nsi pull        # pull
+nsi settings    # remet la configuration du projet à la version du modèle
 ```
-
-`nsi update` retélécharge le script depuis GitHub raw, remplace `/usr/local/bin/nsi` et termine immédiatement (`exit 0`).
 
 ## Structure du repo
 
 ```
 repo/
-  setup.ps1         # bootstrap Windows
-  nsi               # script shell principal (Linux / Mac / WSL)
-  settings.json     # paramètres VSCode déployés dans .vscode/ du dépôt élève
-  extensions.json   # recommandations d'extensions VSCode
-  tasks.json        # tâche VSCode : nsi pull automatique à l'ouverture
-  pyproject.toml    # projet Python uv déployé dans le dépôt élève
-  .gitignore        # gitignore Python/Gleam/Rust/Java déployé dans le dépôt élève
-  .gitattributes    # force LF pour les scripts shell, CRLF pour .ps1
+  setup-windows.ps1   # amorçage Windows
+  setup.sh            # amorçage WSL / Linux / macOS
+  nsi                 # l'outil
+  ARCHI.md            # l'architecture, qui fait foi
+  SETUP-ORG.md        # mise en place de l'organisation GitHub, côté prof
+  README.md           # mode d'emploi élève
+  .gitattributes      # LF pour les scripts shell, CRLF pour .ps1
 ```
 
-## Gestion de git
+Les fichiers de configuration de l'élève (`settings.json`, `pyproject.toml`,
+`.gitignore`…) **ne sont pas ici** : ils vivent dans le dépôt-modèle
+`nsi-bf/template-eleves`, source unique.
 
-```
-nsi git         # configuration initiale
-nsi push        # commit horodaté + push
-nsi pull        # pull
-nsi settings    # redéploie settings.json / extensions.json / tasks.json / pyproject.toml / .gitignore
-```
+## Côté prof : l'organisation GitHub
 
-### Convention de nommage GitHub (organisation `nsi-bf`)
+Voir [`SETUP-ORG.md`](SETUP-ORG.md).
 
-**Contrat partagé avec metatest, documenté à l'identique des deux côtés** — metatest
-l'écrit (`outils/equipe_github.py`, fonctions `nom_equipe`/`nom_depot`), `nsi git`
-le relit ci-dessous. Ce sont deux dépôts distincts : rien ne les synchronise
-automatiquement, une modification d'un côté doit être répercutée manuellement de
-l'autre.
+L'organisation est `nsi-bf`. **Tout ce qui la peuple est fait par metatest**
+(`outils/equipe_github.py`), qui seul connaît la base des élèves : équipes,
+dépôts, dépôt-modèle. Ce dépôt-ci ne contient aucun outil d'administration
+(`nsi-admin` a été supprimé le 2026-09-11, redondant et divergent).
 
-- **Année scolaire** : `AAAA-AAAA+1`, bascule le 1ᵉʳ août (pas le 1ᵉʳ janvier).
-  Ex. `2026-2027`.
-- **Équipe (team GitHub)** : `<classe>_<année>` — ex. `TNSINFGR_2_2026-2027`.
-  `<classe>` est le nom de classe tel qu'il est dans metatest, sans
-  transformation. Les classes reviennent chaque année sous le même nom ;
-  l'année désambiguïse.
-- **Dépôt élève** : `<équipe>-<pseudo_github>` — ex.
-  `TNSINFGR_2_2026-2027-Marie-Dupont`. Garantit un dépôt neuf par inscription,
-  y compris pour un élève qui repasse par le système une autre année.
-- **Dossier local (poste élève)** : `~/<équipe>` — ex.
-  `~/TNSINFGR_2_2026-2027`, jamais `~/<pseudo>`. Distinct d'une année sur
-  l'autre pour un même élève : jamais de collision avec un ancien clone.
-- **Organisation** : `nsi-bf`.
-- **Caractères autorisés** dans classe et pseudo (donc dans équipe et dépôt) :
-  alphanumériques ASCII, `.`, `_`, `-` uniquement — validé côté écriture par
-  `nom_depot()` dans `equipe_github.py`.
-- **Désambiguïsation** si un élève appartient à plusieurs équipes de l'année en
-  cours (ne devrait pas arriver en temps normal — une équipe par élève et par
-  année) : celle commençant par `T` (terminale) l'emporte sur celle en `P`
-  (première).
+### Convention de nommage
+
+**Contrat partagé avec metatest, documenté à l'identique des deux côtés** —
+metatest l'écrit (`nom_equipe`/`nom_depot` dans `outils/equipe_github.py`),
+`nsi git` le relit. Deux dépôts distincts, rien ne les synchronise : une
+modification d'un côté est à répercuter à la main de l'autre.
+
+- **Année scolaire** : `AAAA-AAAA+1`, bascule le 1ᵉʳ août. Ex. `2026-2027`.
+- **Équipe** : `<classe>_<année>` — ex. `1G3_2026-2027`. Le nom de classe est
+  celui de metatest, sans transformation ; les classes reviennent chaque année
+  sous le même nom, l'année désambiguïse.
+- **Dépôt élève** : `<équipe>-<compte>` — ex. `1G3_2026-2027-Marie-Dupont`.
+  Un dépôt neuf par inscription, même pour un élève qui repasse une autre année.
+- **Dossier local** : `~/<équipe>`, jamais `~/<pseudo>` — jamais de collision
+  avec un ancien clone.
+- **Caractères autorisés** : alphanumériques ASCII, `.`, `_`, `-` uniquement,
+  validé côté écriture par `nom_depot()`.
+- **Désambiguïsation** si plusieurs équipes la même année (ne devrait pas
+  arriver) : celle commençant par `T` l'emporte sur celle en `P`.
 
 ### `nsi git`
 
-Interdit à root. Configure git et authentifie GitHub. Demande interactivement un seul champ : un token d'accès personnel (portées `repo` et `read:org`, créé sur https://github.com/settings/tokens). `read:org` est nécessaire pour retrouver l'équipe de l'élève (ci-dessus), `repo` seul ne suffit plus.
+Interdit à root. Demande un seul champ : un token d'accès personnel, portées
+`repo` **et** `read:org` (`read:org` sert à retrouver l'équipe ; `repo` seul ne
+suffit pas).
 
-Les dépôts élèves vivent dans l'organisation `nsi-bf`, gérée côté prof depuis **metatest** (`outils/equipe_github.py`), pas depuis `nsi-admin`. `nsi git` ne demande ni classe ni nom de dépôt : une fois authentifié, il récupère le pseudo via `gh api user --jq .login`, calcule l'année scolaire en cours, retrouve l'équipe correspondante via `gh api /user/teams`, et en déduit dépôt et dossier local selon la [convention de nommage](#convention-de-nommage-github-organisation-nsi-bf) ci-dessus. Si aucune équipe ou aucun dépôt n'est trouvé (élève pas encore inscrit, invitations pas acceptées, classe pas encore mise en place côté metatest), affiche un message d'erreur et s'arrête sans rien créer.
+Ne demande ni classe ni nom de dépôt : il lit le pseudo (`gh api user`),
+calcule l'année scolaire, retrouve l'équipe (`gh api /user/teams`), en déduit
+dépôt et dossier selon la convention ci-dessus. Si aucune équipe ou aucun dépôt
+n'est trouvé (élève pas encore inscrit, invitations pas acceptées, classe pas
+encore mise en place), affiche une erreur et s'arrête sans rien créer.
 
-`git config user.name` est mis au pseudo GitHub (pas de nom réel demandé) ; `git config user.email` est dérivé en `<pseudo>@users.noreply.github.com` (l'adresse "no-reply" standard de GitHub), l'API `/user` ne renvoyant l'email public que si l'élève l'a explicitement rendu public sur son profil (rare), et lire l'email privé nécessiterait le scope `user:email` en plus.
+- `git config user.name` = pseudo GitHub (pas de nom réel demandé).
+- `git config user.email` = `<pseudo>@users.noreply.github.com` : l'API `/user`
+  ne rend l'email que s'il est public (rare), et lire l'email privé exigerait
+  la portée `user:email` en plus.
+- `gh auth login --with-token` n'authentifie que `gh`. `gh auth setup-git` est
+  appelé juste après pour l'enregistrer comme credential helper — sans ça,
+  `nsi push`/`nsi pull`, qui appellent `git` directement, ne le seraient pas.
 
-`gh auth login --with-token` authentifie uniquement le CLI `gh` (utilisé pour `gh repo view`/`gh repo clone`) ; il ne configure pas `git` lui-même. `gh auth setup-git` est donc appelé juste après pour enregistrer `gh` comme credential helper git — sans ça, `nsi push`/`nsi pull` (qui utilisent `git` directement) ne seraient pas authentifiés.
+Clone ensuite le dépôt dans `~/<équipe>`, lance `uv sync`, ouvre VSCode.
+**Ne déploie aucun fichier** : ils viennent du modèle dont le dépôt est issu.
 
-Déploie ensuite `.vscode/settings.json`, `.vscode/extensions.json`, `.vscode/tasks.json`, `pyproject.toml`, `.gitignore`, lance `uv sync`, puis ouvre VSCode dans le dossier.
+### `nsi settings`
 
-### `nsi push`
+Retélécharge les fichiers de configuration depuis `nsi-bf/template-eleves` et
+les écrase. Commande explicite, avec avertissement à l'élève : elle réinitialise
+`pyproject.toml`, donc ses `uv add`.
 
-Équivalent de `git add -A && git commit -m "Sauvegarde du <date>" && git push`. Ne produit pas d'erreur si rien n'a changé.
+### `nsi push` / `nsi pull`
 
-### `nsi pull`
-
-Équivalent de `git pull`.
-
-## Organisation GitHub (côté prof)
-
-Les dépôts élèves ne sont pas des dépôts personnels : ils vivent dans l'organisation GitHub **`mmarchand-teacher`**, ce qui garantit un accès prof permanent (owner de l'org) sans dépendre d'une invitation par élève.
-
-- **Dépôt template** : `mmarchand-teacher/template-eleve`, marqué "Template repository" dans ses Settings. Contient la même base que celle déployée par `nsi git`/`nsi settings` (README, pyproject.toml, .gitignore, .vscode/).
-- **Team par classe** (ex. `Classe-1B`) : sert uniquement de *roster* — invitation groupée des élèves dans l'organisation et regroupement visuel. **Aucun dépôt n'y est jamais attaché**, pour que les élèves d'une même classe n'aient jamais accès aux dépôts des autres.
-- **Accès aux dépôts** : chaque élève est ajouté individuellement comme collaborateur en écriture (`push`) sur son propre dépôt uniquement.
-
-Ce modèle implique deux invitations à accepter côté élève (organisation via la team, puis dépôt individuel) avant que `nsi git` fonctionne.
-
-### `nsi-admin`
-
-Script bash, usage local uniquement par le prof (jamais déployé/auto-mis à jour comme `nsi`). Authentification préalable requise : `gh auth login` en tant que owner de l'organisation.
-
-```
-./nsi-admin <fichier.csv> <nom-de-classe>
-```
-
-CSV sans en-tête, une ligne par élève : `nom,pseudo_github`.
-
-Pour chaque élève, de façon idempotente : invite dans la team roster de la classe, crée son dépôt depuis `template-eleve` s'il n'existe pas, l'ajoute comme collaborateur en écriture sur ce seul dépôt.
-
-## Paramètres VSCode déployés (`settings.json`)
-
-- `files.autoSave: afterDelay` (1 s) — sauvegarde automatique
-- `git.autofetch: true` — synchronisation automatique avec le remote
-- `files.exclude` — masque `.vscode/`, `pyproject.toml`, `.gitignore` dans l'Explorer
-- Désactivation de Copilot, télémétrie, suggestions IA
-
-## Extensions VSCode
-
-- **Installée automatiquement** (setup.ps1) : `ms-vscode-remote.remote-wsl`
-- **Recommandées** (extensions.json, VSCode propose à l'ouverture du dépôt) :
-  `tomoki1207.pdf`, `ms-python.python`, `ms-vscode.test-adapter-converter`,
-  `hbenl.vscode-test-explorer`, `iterteam.dependi`, `aaron-bond.better-comments`,
-  `tamasfe.even-better-toml`, `sanaajani.taskrunnercode`
+`git add -A && git commit -m "Sauvegarde du <date>" && git push` — sans erreur
+si rien n'a changé. Et `git pull`.

@@ -2,8 +2,8 @@ $ErrorActionPreference = "Stop"
 
 try {
 
-$SetupUrl  = "https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.ps1"
-$NsiUrl    = "https://raw.githubusercontent.com/nsi-bf/scripts-install/main/nsi"
+$SetupUrl  = "https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1"
+$SetupShUrl = "https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.sh"
 $Distro    = "Debian"
 $WslUser   = "padawan"
 $WslPass   = "padawan"
@@ -103,23 +103,18 @@ Invoke-Native wsl -d $Distro -u root -- true
 Write-Host "Configuration de l'utilisateur $WslUser..."
 Invoke-Native wsl -d $Distro -u root -- bash -c "useradd -m -s /bin/bash $WslUser 2>/dev/null; echo '${WslUser}:${WslPass}' | chpasswd; usermod -aG sudo $WslUser"
 
-# 6. Téléchargement de nsi
-# nsi vit chez l'utilisateur (~/.local/bin) et non dans /usr/local/bin :
-# il n'a alors plus besoin de root pour se mettre à jour lui-même.
-# curl, lui, reste un paquet système, donc installé en root juste avant.
-Write-Host "Installation de nsi..."
-Invoke-Native wsl -d $Distro -u root -- bash -c "apt-get update -qq && apt-get install -y -qq curl"
-Invoke-Native wsl -d $Distro -u $WslUser -- bash -c "mkdir -p ~/.local/bin && curl -fsSL $NsiUrl -o ~/.local/bin/nsi && chmod +x ~/.local/bin/nsi"
-
-# 7. Sudo sans mot de passe pour padawan
+# 6. Sudo sans mot de passe pour padawan
+# Nécessaire parce que l'installation qui suit est lancée sans terminal : il n'y
+# aurait personne pour taper un mot de passe. Révoqué dès qu'elle est finie.
 Invoke-Native wsl -d $Distro -u root -- bash -c "echo '$WslUser ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/$WslUser && chmod 440 /etc/sudoers.d/$WslUser"
 
-# 8. Installation des outils de base en tant que padawan
-# Chemin complet : `wsl -- commande` n'ouvre pas de shell de connexion,
-# donc ~/.local/bin n'est pas encore dans le PATH à ce stade. Il y entrera
-# pour l'élève via le bloc .local/bin du ~/.profile fourni par Debian.
-Write-Host "Installation des outils de base..."
-Invoke-Native wsl -d $Distro -u $WslUser -- /home/$WslUser/.local/bin/nsi install base
+# 7. curl, seul paquet posé d'ici : c'est lui qui ira chercher setup.sh.
+Invoke-Native wsl -d $Distro -u root -- bash -c "apt-get update -qq && apt-get install -y -qq curl"
+
+# 8. Passage de main à setup.sh, qui installe l'environnement élève.
+# Ce script-ci ne connaît aucun outil pédagogique : ni nsi, ni uv, ni gleam.
+Write-Host "Installation de l'environnement de développement..."
+Invoke-Native wsl -d $Distro -u $WslUser -- bash -c "curl -fsSL $SetupShUrl | bash"
 
 # Révocation du sudo sans mot de passe
 Invoke-Native wsl -d $Distro -u root -- rm -f /etc/sudoers.d/$WslUser

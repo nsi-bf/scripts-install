@@ -11,7 +11,7 @@ Bienvenue ! Ces instructions te permettent d'installer en quelques minutes tout 
 Ouvre **cmd.exe** ou **PowerShell** et colle cette commande :
 
 ```
-powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex"
 ```
 
 > Si l'installation te demande de redémarrer, fais-le puis relance exactement la même commande.
@@ -21,10 +21,12 @@ powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/nsi
 Ouvre un terminal et colle cette commande :
 
 ```
-curl -fsSL https://raw.githubusercontent.com/nsi-bf/scripts-install/main/nsi | sudo bash -s -- install base
+curl -fsSL https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.sh | bash
 ```
 
-> Si l'installation te demande de redémarrer, fais-le puis relance exactement la même commande.
+> Pas de `sudo` devant : l'installation demandera elle-même ton mot de passe si elle en a besoin.
+
+Quand c'est fini, **ouvre un nouveau terminal** avant de passer à la suite.
 
 ---
 
@@ -32,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/nsi-bf/scripts-install/main/nsi | s
 
 Rends-toi sur [https://github.com/join](https://github.com/join) et crée un compte.
 
-> **Note bien quelque part ton nom d'utilisateur GitHub et donne-le à ton prof.** Il/elle prépare ton dépôt de cours et t'invite dessus. Tu recevras deux e-mails/notifications GitHub à accepter (invitation à l'organisation, puis au dépôt) avant de pouvoir passer à l'étape suivante.
+> **Note bien quelque part ton nom d'utilisateur GitHub et donne-le à ton prof.** Il/elle prépare ton dépôt de cours et t'invite dessus. Tu recevras deux invitations GitHub à accepter (l'organisation, puis le dépôt) avant de pouvoir passer à l'étape suivante.
 
 ---
 
@@ -48,8 +50,11 @@ nsi git
 
 Il te sera demandé un **token d'accès personnel** (une sorte de mot de passe sécurisé). Ton dépôt et ton identité git sont retrouvés automatiquement à partir de ce token : rien d'autre à taper.
 
-Pour créer ton token : va sur [https://github.com/settings/tokens](https://github.com/settings/tokens), crée un token avec la portée (scope) `repo`.  
-**Attention : le token ne s'affiche qu'une seule fois, copie-le immédiatement.**
+Pour créer ton token : va sur [https://github.com/settings/tokens](https://github.com/settings/tokens), clique sur **Generate new token (classic)**, et coche les deux portées **`repo`** et **`read:org`**.
+
+> `read:org` sert à retrouver ta classe : sans elle, `nsi git` ne trouvera pas ton dépôt.
+>
+> **Attention : le token ne s'affiche qu'une seule fois, copie-le immédiatement.**
 
 Une fois terminé, **VSCode s'ouvre automatiquement** dans ton dépôt. C'est là que tu travailleras.
 
@@ -92,6 +97,7 @@ GitHub remplace la clé USB. Tes fichiers y sont stockés en ligne, accessibles 
 | `nsi git` | Configuration initiale de git et GitHub |
 | `nsi push` | Sauvegarde et envoie ton travail sur GitHub |
 | `nsi pull` | Récupère la dernière version depuis GitHub |
+| `nsi settings` | Remet la configuration du projet à la version du prof |
 | `nsi update` | Met à jour l'outil `nsi` |
 | `nsi install <composant>` | Installe un composant supplémentaire |
 | `nsi remove <composant>` | Désinstalle un composant |
