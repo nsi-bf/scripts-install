@@ -29,7 +29,7 @@ $LxssPath   = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss"
 #
 # Sans lui, le lancement qui suit le redémarrage est indiscernable d'un poste
 # de lycée : les fonctionnalités WSL viennent d'être activées, donc le service
-# `LxssManager` existe et VSCode est déjà installé — la sonde répondrait « WSL
+# `LxssManager` existe et VSCode est déjà installé, la sonde répondrait « WSL
 # est là, rien à élever » alors que WSL n'a été ni mis à jour ni passé en
 # version 2. Et comme un redémarrage est obligatoire sur toute machine neuve,
 # ce n'est pas un cas rare : c'est le parcours normal.
@@ -114,7 +114,7 @@ function Get-WslPath {
 #
 # On lit donc l'état, sans rien lancer. Deux noms de service, parce qu'il y a
 # deux WSL : `LxssManager` pour le composant Windows historique, `WSLService`
-# pour la version livrée par le Store — sur une machine à jour, c'est
+# pour la version livrée par le Store, sur une machine à jour, c'est
 # `WSLService` qui est là et `LxssManager` qui manque (mesuré le 2026-09-11,
 # WSL 2.7.13.0). Le paquet Store sert de troisième filet.
 function Test-WslInstalle {
@@ -167,22 +167,70 @@ function Clear-Marqueur {
 # Ce script sert deux situations.
 #
 # Chez l'élève, tout est à installer, et il est administrateur de sa machine.
-# Au lycée, VSCode et WSL sont déjà là, posés par l'image du poste — et l'élève
+# Au lycée, VSCode et WSL sont déjà là, posés par l'image du poste, et l'élève
 # n'est PAS administrateur : demander l'élévation n'échouerait pas seulement,
 # elle serait impossible.
 #
 # On ne lui demande pas où il est : la machine sait répondre, et un débutant
-# peut se tromper. Tout ce qui exige l'administrateur — poser VSCode, activer
-# les fonctionnalités Windows, mettre WSL à jour — ne sert qu'à obtenir ces
+# peut se tromper. Tout ce qui exige l'administrateur, poser VSCode, activer
+# les fonctionnalités Windows, mettre WSL à jour, ne sert qu'à obtenir ces
 # deux choses-là. Si elles sont déjà là, il n'y a rien à élever.
 #
 # `Get-WindowsOptionalFeature -Online` exige l'administrateur (mesuré :
 # « L'opération demandée nécessite une élévation »), donc il n'est consulté que
-# dans la branche administrateur — où l'on est, par construction, élevé.
+# dans la branche administrateur, où l'on est, par construction, élevé.
 function Get-BesoinAdmin {
     if (Test-Marqueur) { return $true }
     $wslPresent = ($null -ne $script:Wsl) -and (Test-WslInstalle)
     return (-not $wslPresent) -or ($null -eq $script:Code)
+}
+
+
+# Ce que les sondes ont vu, en clair. Affiché dès qu'on conclut qu'il faut
+# l'administrateur, et quand quelque chose échoue : sans ça, « cet ordinateur
+# n'a pas tout ce qu'il faut » ne dit pas *quoi*, et il n'y a rien à corriger.
+function Show-Diagnostic {
+    $admin   = Test-Admin
+    $bits    = [Environment]::Is64BitProcess
+    $cheminW = if ($null -eq $script:Wsl)  { "<introuvable>" } else { $script:Wsl }
+    $cheminC = if ($null -eq $script:Code) { "<introuvable>" } else { $script:Code }
+
+    $svc = @(Get-Service -ErrorAction SilentlyContinue |
+             Where-Object { $_.Name -match "lxss|wsl" } |
+             ForEach-Object { $_.Name + "=" + $_.Status })
+    $services = if ($svc.Count -eq 0) { "<aucun>" } else { $svc -join ", " }
+
+    $store = "<absent>"
+    try {
+        $appx = Get-AppxPackage -Name "MicrosoftCorporationII.WindowsSubsystemForLinux" -ErrorAction SilentlyContinue
+        if ($null -ne $appx) { $store = $appx.Version }
+    } catch {
+        $store = "<Get-AppxPackage a echoue : " + $_.Exception.Message + ">"
+    }
+
+    $wg = Get-Command winget -ErrorAction SilentlyContinue
+    $winget = if ($null -eq $wg) { "<introuvable>" } else { $wg.Source }
+
+    $distros = "<cle Lxss absente>"
+    if (Test-Path $LxssPath) {
+        $noms = @(Get-ChildItem $LxssPath -ErrorAction SilentlyContinue |
+                  ForEach-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DistributionName })
+        $distros = if ($noms.Count -eq 0) { "<aucune>" } else { $noms -join ", " }
+    }
+
+    Write-Host ""
+    Write-Host "--- Etat detecte ---" -ForegroundColor Yellow
+    Write-Host "  administrateur    : $admin"
+    Write-Host "  processus 64 bits : $bits"
+    Write-Host "  wsl.exe           : $cheminW"
+    Write-Host "  services WSL      : $services"
+    Write-Host "  paquet Store WSL  : $store"
+    Write-Host "  code              : $cheminC"
+    Write-Host "  winget            : $winget"
+    Write-Host "  distributions     : $distros"
+    Write-Host "  marqueur          : $(Test-Marqueur)"
+    Write-Host "--------------------" -ForegroundColor Yellow
+    Write-Host ""
 }
 
 
@@ -212,14 +260,18 @@ function Request-Admin {
             -ArgumentList "-ExecutionPolicy Bypass -Command `"irm '$SetupUrl' | iex`""
         exit
     } catch {
-        # Refus de l'UAC, ou compte sans droit d'élévation : au lycée c'est le
-        # cas normal, et ça veut dire que l'image du poste est incomplète.
+        # Refus de l'UAC, ou compte sans droit d'élévation. On dit laquelle :
+        # le message seul ne laissait rien à corriger.
+        Write-Red ""
+        Write-Red "L'ELEVATION DES PRIVILEGES A ECHOUE."
+        Write-Red "Detail : $($_.Exception.Message)"
+        Show-Diagnostic
         Stop-VoirLeProf "CET ORDINATEUR N'A PAS TOUT CE QU'IL FAUT, ET JE NE PEUX PAS L'INSTALLER."
     }
 }
 
 # winget est livré avec Windows 11 et Windows 10 1809+, mais par le paquet App
-# Installer du Microsoft Store — donc absent d'une édition N ou LTSC, d'un
+# Installer du Microsoft Store, donc absent d'une édition N ou LTSC, d'un
 # Windows 10 jamais mis à jour, ou d'un poste dont le Store a été désactivé ou
 # abîmé. Et un winget ancien ne connaît pas `--accept-source-agreements`.
 #
@@ -231,7 +283,7 @@ function Request-Admin {
 #
 # La mise à jour, elle, passe par winget lui-même : il se livre comme le paquet
 # Microsoft.AppInstaller et sait donc se mettre à jour depuis la version 1.6.
-# Silencieuse et jamais fatale, pour la même raison que celle de WSL — on ne
+# Silencieuse et jamais fatale, pour la même raison que celle de WSL, on ne
 # sait pas distinguer « déjà à jour » d'un échec sans lire un message localisé.
 function Initialize-Winget {
     if ($null -eq (Get-Command winget -ErrorAction SilentlyContinue)) {
@@ -296,7 +348,7 @@ function Enable-FonctionnalitesWsl {
 # commande arrête les distributions en cours, donc elle tue la session depuis
 # laquelle on l'observe (constaté le 2026-09-11, 2.7.11.0 → 2.7.13.0). Sans
 # savoir si ce code vaut 0, un avertissement conditionnel s'afficherait peut-
-# être à chaque installation réussie — et un élève qui voit un avertissement
+# être à chaque installation réussie, et un élève qui voit un avertissement
 # chaque fois apprend à ne plus les lire. Un WSL réellement trop vieux se
 # signalera à l'étape suivante, où `wsl --install -d` échouera pour de bon.
 function Update-Wsl {
@@ -346,7 +398,7 @@ function Install-CoteWindows {
 # Dans les deux cas, y compris au lycée : les extensions VSCode s'installent
 # par utilisateur, dans son profil. Que l'image du poste porte VSCode ne dit
 # rien de ce que l'élève a dans le sien, et sans cette extension il ne peut pas
-# ouvrir son dossier WSL depuis VSCode — c'est-à-dire travailler. Elle ne
+# ouvrir son dossier WSL depuis VSCode, c'est-à-dire travailler. Elle ne
 # demande aucun droit et ne fait rien si elle est déjà là.
 function Install-ExtensionWsl {
     Invoke-Native $script:Code --install-extension ms-vscode-remote.remote-wsl
@@ -377,7 +429,7 @@ function New-UtilisateurPadawan {
 
 # Le NOPASSWD est indispensable : l'installation qui suit est lancée sans
 # terminal, personne ne pourrait taper un mot de passe. Révoqué dès la fin,
-# y compris si setup.sh échoue — d'où le `finally`.
+# y compris si setup.sh échoue, d'où le `finally`.
 function Install-EnvironnementEleve {
     Invoke-Native $script:Wsl -d $Distro -u root -- bash -c "echo '$WslUser ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/$WslUser && chmod 440 /etc/sudoers.d/$WslUser"
     try {
@@ -412,7 +464,7 @@ function Open-ConsoleDebian {
     # `bash -lc`, pas `bash -c` : un shell de connexion lit ~/.profile, donc
     # ~/.local/bin entre dans le PATH et `nsi` est trouvable. Mesuré sur une
     # Debian, environnement vierge : `bash -c` donne
-    # /usr/local/bin:/usr/bin:/bin:/sbin et rien d'autre — `nsi init` échouerait
+    # /usr/local/bin:/usr/bin:/bin:/sbin et rien d'autre, `nsi init` échouerait
     # sur un « command not found » dès la console finale.
     # `nsi dir` imprime le dossier de cours, que seul `nsi init` connaît : il
     # dépend de l'équipe GitHub de l'élève. Le `$` est échappé en `` `$ `` pour
@@ -429,9 +481,15 @@ try {
     $besoinAdmin = Get-BesoinAdmin
 
     # L'élévation d'abord, le mot d'accueil ensuite : dans l'autre ordre,
-    # l'élève lit le texte, appuie sur entrée, accepte l'UAC — et retrouve le
+    # l'élève lit le texte, appuie sur entrée, accepte l'UAC, et retrouve le
     # même texte et la même attente dans la fenêtre élevée.
-    if ($besoinAdmin) { Request-Admin }   # ne revient que si on est déjà admin
+    if ($besoinAdmin) {
+        # Dit pourquoi on va demander l'élévation. Quand elle n'était pas
+        # nécessaire, c'est ici qu'on voit laquelle des deux sondes se trompe.
+        Write-Host "Il manque quelque chose cote Windows, je demande les droits administrateur."
+        Show-Diagnostic
+        Request-Admin          # ne revient que si on est déjà administrateur
+    }
 
     Show-Accueil
 
@@ -454,6 +512,8 @@ try {
 } catch {
     Write-Host ""
     Write-Red "ERREUR : $_"
+    Write-Red "Ligne  : $($_.InvocationInfo.ScriptLineNumber) - $($_.InvocationInfo.Line.Trim())"
+    try { Show-Diagnostic } catch {}
     Write-Host ""
     Read-Host "Appuie sur entrée pour quitter"
     exit 1

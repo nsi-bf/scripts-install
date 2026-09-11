@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — amorçage de l'environnement élève sur WSL, Linux ou macOS.
+# setup.sh, amorçage de l'environnement élève sur WSL, Linux ou macOS.
 #
 #   curl -fsSL https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.sh | bash
 #
@@ -9,7 +9,7 @@
 #
 # Il tourne dans deux contextes, dont un sans terminal : setup-windows.ps1
 # l'appelle par `wsl -u padawan -- bash -c "curl … | bash"`. Rien ici ne doit
-# donc attendre une saisie — pas de `read`, pas de question.
+# donc attendre une saisie, pas de `read`, pas de question.
 
 set -euo pipefail
 
@@ -38,8 +38,8 @@ echo "Ton mot de passe peut être demandé pour installer des paquets système."
 echo ""
 
 # --- curl ---
-# Seul paquet système que ce script pose lui-même. Normalement déjà là — il
-# arrive lui-même par curl — sauf sur une Debian WSL fraîche, où
+# Seul paquet système que ce script pose lui-même. Normalement déjà là, il
+# arrive lui-même par curl, sauf sur une Debian WSL fraîche, où
 # setup-windows.ps1 l'a installé juste avant.
 if ! command -v curl &>/dev/null; then
     echo "Installation de curl..."
@@ -67,7 +67,7 @@ mv "$tmp" "$INSTALL_PATH"
 # Poser nsi ne suffit pas : il faut qu'un shell de connexion le trouve, sinon
 # le `nsi init` qu'on annonce plus bas échoue sur un « command not found ».
 #
-# Sur Debian, `~/.profile` ajoute `~/.local/bin` *si le dossier existe* — il
+# Sur Debian, `~/.profile` ajoute `~/.local/bin` *si le dossier existe*, il
 # vient d'être créé, donc c'est réglé. Sur macOS le shell par défaut est zsh,
 # qui ne lit pas `~/.profile` du tout : sans cette fonction, `nsi` ne serait
 # jamais dans le PATH.
@@ -121,7 +121,7 @@ assurer_path
 
 # --- La suite : nsi init ---
 #
-# Elle est interactive — elle demande un jeton GitHub — et deux choses
+# Elle est interactive, elle demande un jeton GitHub, et deux choses
 # l'empêchent de lire le clavier telle quelle :
 #
 #   1. sous `curl … | bash`, stdin est le tuyau de curl. Un `read` n'y trouve
@@ -144,12 +144,12 @@ if (exec </dev/tty) 2>/dev/null; then
 
     # Ouvrir VSCode est une commodité d'amorçage : c'est ici qu'elle a sa
     # place, pas dans `nsi init`, qui se contente de configurer et de cloner.
-    # Le dossier n'est connu qu'après coup — il dépend de l'équipe GitHub de
-    # l'élève — et c'est `nsi dir` qui le dit, pour ne pas coder ici le chemin
+    # Le dossier n'est connu qu'après coup, il dépend de l'équipe GitHub de
+    # l'élève, et c'est `nsi dir` qui le dit, pour ne pas coder ici le chemin
     # de l'état interne de nsi.
     # `code` est gardé : `set -e` ferait mourir le script sur sa dernière
     # ligne, après que tout a réussi, si VSCode n'était pas installé ou si sa
-    # commande n'était pas dans le PATH — ce qui arrive sur macOS tant que
+    # commande n'était pas dans le PATH, ce qui arrive sur macOS tant que
     # « Install 'code' command in PATH » n'a pas été lancé depuis VSCode.
     if dossier="$("$INSTALL_PATH" dir 2>/dev/null)"; then
         if command -v code &>/dev/null; then

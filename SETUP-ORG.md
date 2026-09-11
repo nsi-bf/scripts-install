@@ -1,7 +1,7 @@
 # Mise en place de l'organisation GitHub (côté prof)
 
-L'organisation est **`nsi-bf`**. Tout ce qui la peuple — équipes, dépôts
-d'élèves, dépôt-modèle — est fait par **metatest**, qui seul connaît la base des
+L'organisation est **`nsi-bf`**. Tout ce qui la peuple, équipes, dépôts
+d'élèves, dépôt-modèle, est fait par **metatest**, qui seul connaît la base des
 élèves : `outils/equipe_github.py`. Ce dépôt-ci ne contient plus d'outil
 d'administration (`nsi-admin` a été supprimé le 2026-09-11 : il faisait le même
 geste avec d'autres noms, et les deux avaient divergé).
@@ -26,7 +26,7 @@ gh auth login --hostname github.com   # en tant que mmarchand-teacher
 `nsi-bf` → **Settings** → **Member privileges**.
 
 **À ne pas sauter :** `Base permissions` doit être sur **`No permission`**.
-C'est ce réglage — pas l'équipe — qui décide si être membre de l'organisation
+C'est ce réglage, pas l'équipe, qui décide si être membre de l'organisation
 donne un accès par défaut à *tous* ses dépôts. Laissé sur `Read` ou plus, chaque
 élève verrait les dépôts de tous les autres.
 
@@ -41,7 +41,7 @@ débutants.
 ## 3. Le dépôt-modèle
 
 `nsi-bf/template-eleves` : privé, marqué **Template repository**. C'est la
-**source unique** des fichiers de configuration de l'élève — ne pas les
+**source unique** des fichiers de configuration de l'élève, ne pas les
 dupliquer dans `scripts-install`.
 
 **Son contenu se règle à part, à la main.** `settings.json` et `pyproject.toml`
@@ -52,7 +52,7 @@ de ces fichiers.
 Ce que metatest fait, et ne fait pas :
 
 - il **crée** le dépôt-modèle s'il n'existe pas, et y pose les fichiers de
-  `outils/modele/` — une amorce, pour qu'un modèle neuf ne soit pas vide ;
+  `outils/modele/`, une amorce, pour qu'un modèle neuf ne soit pas vide ;
 - il ne **réécrit jamais** un fichier déjà présent dans le modèle
   (`assurer_modele` : `if present and not neuf: continue`). Le réglage à la main
   ne risque rien ;
@@ -94,12 +94,12 @@ classe, création de son dépôt depuis le modèle, ajout en collaborateur
 | | |
 |---|---|
 | Année scolaire | `AAAA-AAAA+1`, bascule le 1ᵉʳ août |
-| Équipe | `<classe>_<année>` — `1G3_2026-2027` |
-| Dépôt élève | `<équipe>-<compte>` — `1G3_2026-2027-Marie-Dupont` |
+| Équipe | `<classe>_<année>`, `1G3_2026-2027` |
+| Dépôt élève | `<équipe>-<compte>`, `1G3_2026-2027-Marie-Dupont` |
 | Dossier local | `~/<équipe>` |
 
 Contrat partagé : metatest l'écrit (`nom_equipe`/`nom_depot`), `nsi init` le
-relit. Rien ne synchronise les deux dépôts — une modification d'un côté est à
+relit. Rien ne synchronise les deux dépôts, une modification d'un côté est à
 répercuter à la main de l'autre.
 
 ## 5. Propager une correction du modèle
@@ -118,7 +118,7 @@ le dit ; `--forcer` passe outre.
 
 - [ ] `equipe_github.py` sur une classe d'un seul élève test
 - [ ] accepter les deux invitations reçues (organisation, puis dépôt)
-- [ ] `nsi init` — le dépôt se clone sans rien demander de plus que le token
+- [ ] `nsi init`, le dépôt se clone sans rien demander de plus que le token
 - [ ] modifier un fichier, `nsi push`, vérifier le commit sur GitHub
 - [ ] sur une autre machine (ou après suppression du dossier), `nsi init` puis
       `nsi pull` récupère la modification

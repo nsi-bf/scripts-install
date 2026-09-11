@@ -1,10 +1,10 @@
-# NSI Dev — Ton environnement de développement
+# NSI Dev, Ton environnement de développement
 
 Bienvenue ! Ces instructions te permettent d'installer en quelques minutes tout ce dont tu as besoin pour coder en NSI.
 
 ---
 
-## Etape 1 — Installation
+## Etape 1, Installation
 
 ### Windows
 
@@ -30,7 +30,7 @@ Quand c'est fini, **ouvre un nouveau terminal** avant de passer à la suite.
 
 ---
 
-## Etape 2 — Créer un compte GitHub
+## Etape 2, Créer un compte GitHub
 
 Rends-toi sur [https://github.com/join](https://github.com/join) et crée un compte.
 
@@ -38,7 +38,7 @@ Rends-toi sur [https://github.com/join](https://github.com/join) et crée un com
 
 ---
 
-## Etape 3 — Configurer ton compte GitHub
+## Etape 3, Configurer ton compte GitHub
 
 Ouvre **VSCode**, puis ouvre un terminal intégré (`Terminal > Nouveau terminal` ou `Ctrl+ù`).
 
@@ -58,7 +58,7 @@ Une fois terminé, **VSCode s'ouvre automatiquement** dans ton dépôt. C'est l�
 
 ---
 
-## Etape 4 — Sauvegarder et récupérer ton travail
+## Etape 4, Sauvegarder et récupérer ton travail
 
 ### Sauvegarder
 

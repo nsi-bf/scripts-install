@@ -14,7 +14,7 @@ TEMPLATE_FICHIERS=(.vscode/settings.json .vscode/extensions.json
 INSTALL_PATH="$HOME/.local/bin/nsi"
 
 # Où vit le dépôt de l'élève. Une variable shell ne survivrait pas d'une
-# invocation à l'autre — chaque `nsi` est un nouveau processus — et le
+# invocation à l'autre, chaque `nsi` est un nouveau processus, et le
 # recalculer demanderait un appel à l'API GitHub, donc du réseau et une
 # authentification, à chaque `nsi push`. On l'écrit donc une fois, dans
 # `nsi init`, et les autres commandes le relisent.
@@ -33,8 +33,8 @@ ensure_brew() {
     has_brew && return 0
     is_mac || return 0
     echo "Installation de Homebrew..."
-    # Avec stdin branché sur un tuyau — le cas quand nsi est appelé depuis
-    # `curl … | bash` — l'installeur Homebrew bascule de lui-même en mode non
+    # Avec stdin branché sur un tuyau, le cas quand nsi est appelé depuis
+    # `curl … | bash`, l'installeur Homebrew bascule de lui-même en mode non
     # interactif (`elif [[ ! -t 0 ]]`), et passe alors `sudo -n`, qui ne
     # demande jamais de mot de passe. Sur un Mac neuf il s'arrête aussitôt sur
     # « Need sudo access on macOS ». On lui rebranche donc un vrai terminal.
@@ -503,7 +503,7 @@ cmd_reset_config() {
     else ROUGE=""; JAUNE=""; FIN=""; fi
 
     echo ""
-    echo "${ROUGE}ATTENTION — tes dépendances ont été réinitialisées${FIN}"
+    echo "${ROUGE}ATTENTION, tes dépendances ont été réinitialisées${FIN}"
     echo ""
     echo "${JAUNE}pyproject.toml a été remplacé par la version du prof.${FIN}"
     echo "Tous les paquets que tu avais ajoutés avec ${JAUNE}uv add${FIN} ont disparu."
@@ -565,7 +565,7 @@ aller_dans_le_depot() {
 }
 
 # Imprime le dossier de cours de l'élève, et rien d'autre : c'est la seule
-# commande de nsi faite pour être composée — `code "$(nsi dir)"`. Les scripts
+# commande de nsi faite pour être composée, `code "$(nsi dir)"`. Les scripts
 # d'amorçage l'utilisent plutôt que de lire $ETAT_DOSSIER, dont le chemin et le
 # format ne regardent que nsi.
 cmd_dir() {
@@ -632,7 +632,7 @@ cmd_init() {
     # était créée un peu en avance ou en retard sur ce calendrier, les noms
     # d'équipe ne se trient pas (une vieille "Term2425" ne finit même pas par
     # une année), et l'appel à /user/teams imposait la portée `read:org` au
-    # jeton — une case de plus à cocher pour un débutant.
+    # jeton, une case de plus à cocher pour un débutant.
     #
     # On liste donc ses dépôts. La documentation de `affiliation` est explicite
     # sur ce qu'on y trouve : `collaborator` désigne « repositories that the
@@ -641,10 +641,10 @@ cmd_init() {
     # l'inclut déjà.
     #
     # Le filtre sur <classe>_<AAAA-AAAA>-<pseudo> écarte ce qui ne vient pas de
-    # cette convention — les vieux dépôts GitHub Classroom, par exemple — et le
+    # cette convention, les vieux dépôts GitHub Classroom, par exemple, et le
     # tri par date de création donne le plus récent, donc celui de cette année.
     # Le filtrage se fait en shell, pas en jq : `gh api --jq` n'accepte pas
-    # `--arg` — il n'y en a aucun dans `gh api --help` — donc on ne peut pas
+    # `--arg`, il n'y en a aucun dans `gh api --help`, donc on ne peut pas
     # lui passer $pseudo, et `jq` n'est pas installé par `nsi install base`.
     # C'est d'ailleurs ce `--arg` qui cassait la recherche d'équipe : avec
     # `set -euo pipefail`, nsi init mourait sur « unknown flag: --arg ».
@@ -677,7 +677,7 @@ cmd_init() {
 
     # On ne supprime jamais le dossier de l'élève. C'est pourtant ce que faisait
     # `nsi init` : il commençait par un `rm -rf`, si bien que relancer la commande
-    # — ce qu'on lui dit de faire au moindre souci de jeton — effaçait tout ce
+    #, ce qu'on lui dit de faire au moindre souci de jeton, effaçait tout ce
     # qui n'était pas encore poussé. Le `:?` sur $equipe est la ceinture : vide,
     # le chemin aurait désigné le dossier personnel tout entier.
     if [[ -d "$dossier/.git" ]]; then
@@ -709,7 +709,7 @@ cmd_init() {
     # charge, une fois, à la fin de l'installation.
     echo ""
     echo "Git et GitHub configurés pour $pseudo."
-    echo "Dépôt : $repo_name  —  Dossier : ~/$equipe"
+    echo "Dépôt : $repo_name ,  Dossier : ~/$equipe"
 }
 
 # --- auto-install si lancé hors de $INSTALL_PATH ---

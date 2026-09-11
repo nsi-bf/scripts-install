@@ -69,7 +69,7 @@ administrateur.
 **Un marqueur tranche le cas intermédiaire.** Sur une machine neuve, le
 premier lancement active les fonctionnalités WSL et demande un redémarrage.
 Au lancement suivant, l'état est indiscernable d'un poste de lycée :
-`LxssManager` existe, VSCode est installé — la sonde répondrait « rien à
+`LxssManager` existe, VSCode est installé, la sonde répondrait « rien à
 élever », alors que WSL n'a été ni mis à jour ni passé en version 2. Le script
 pose donc `HKCU\SOFTWARE\nsi-bf\InstallationWindowsEnCours` juste avant de
 demander le redémarrage, le relit dans `Get-BesoinAdmin`, et l'efface quand le
@@ -106,7 +106,7 @@ Open-ConsoleDebian
 `$Wsl` et `$Code` sont partagés : affectés au niveau script, relus et réécrits
 par les fonctions via `$script:`.
 
-**Branche administrateur** — `Install-CoteWindows` seule, et tout ce qu'elle
+**Branche administrateur**, `Install-CoteWindows` seule, et tout ce qu'elle
 appelle : `wsl --shutdown` de remise à zéro (réservé à ce cas, il couperait les
 autres fenêtres de l'élève au lycée), `Initialize-Winget`, `Install-VSCode`,
 `Enable-FonctionnalitesWsl`, `Update-Wsl`, WSL 2 par défaut, puis
@@ -116,26 +116,26 @@ Ce `wsl --shutdown` est gardé par `Test-WslInstalle`, pas seulement par la
 présence du binaire : sinon c'est lui qui déclencherait l'auto-installation de
 WSL qu'on cherche à éviter.
 
-- `Initialize-Winget` — si `winget` manque, message ROUGE disant de **ne pas
+- `Initialize-Winget`, si `winget` manque, message ROUGE disant de **ne pas
   insister** et de demander l'assistance du professeur, puis arrêt : les trois
   voies pour l'installer (Store, `Repair-WinGetPackageManager`, `.msixbundle`
   de GitHub) sont hors de portée d'un débutant seul chez lui. Sinon le met à
   jour par lui-même, silencieusement.
-- `Install-VSCode` — relit le PATH machine et utilisateur après l'installation,
+- `Install-VSCode`, relit le PATH machine et utilisateur après l'installation,
   celui du processus étant figé à son démarrage.
-- `Enable-FonctionnalitesWsl` — si une fonctionnalité manquait, affiche en
+- `Enable-FonctionnalitesWsl`, si une fonctionnalité manquait, affiche en
   ROUGE de redémarrer et de relancer la commande, puis s'arrête.
-- `Update-Wsl` — `wsl --update`, repli `--web-download`. Jamais fatal, et
+- `Update-Wsl`, `wsl --update`, repli `--web-download`. Jamais fatal, et
   silencieux même en échec : le code de sortie d'un `--update` sur un WSL déjà
   à jour n'est pas connu, donc un avertissement conditionnel risquerait de
   s'afficher à chaque installation réussie. Un WSL trop vieux échouera
   franchement à l'installation de Debian.
 
-**Commun aux deux** — root *dans* WSL n'est pas administrateur *de Windows* :
+**Commun aux deux**, root *dans* WSL n'est pas administrateur *de Windows* :
 créer un utilisateur Debian, écrire `/etc/wsl.conf` ou poser `DefaultUid` sous
 `HKCU` se font avec les droits de l'élève.
 
-- `Install-ExtensionWsl` — pose `ms-vscode-remote.remote-wsl` **dans les deux
+- `Install-ExtensionWsl`, pose `ms-vscode-remote.remote-wsl` **dans les deux
   cas**, y compris au lycée. Les extensions VSCode s'installent par
   utilisateur, dans son profil : que l'image du poste porte VSCode ne dit rien
   de ce que l'élève a dans le sien. Aucun droit requis, idempotente.
@@ -154,15 +154,15 @@ créer un utilisateur Debian, écrire `/etc/wsl.conf` ou poser `DefaultUid` sous
   (`~/.vscode-server/bin/…/remote-cli/code` masque le script Windows quand il
   existe, mais il n'apparaît qu'après une première connexion Remote-WSL : sur
   une Debian neuve, c'est bien le script Windows qui opère.)
-- `Install-Debian` — `wsl --install -d Debian` si la clé `Lxss` de
+- `Install-Debian`, `wsl --install -d Debian` si la clé `Lxss` de
   l'utilisateur ne la contient pas, puis première initialisation en root.
-- `New-UtilisateurPadawan` — `padawan` / `padawan`, groupe `sudo`.
-- `Install-EnvironnementEleve` — pose le `sudoers.d` NOPASSWD (l'installation
+- `New-UtilisateurPadawan`, `padawan` / `padawan`, groupe `sudo`.
+- `Install-EnvironnementEleve`, pose le `sudoers.d` NOPASSWD (l'installation
   tourne sans terminal, personne ne pourrait taper un mot de passe), installe
   `curl`, appelle `setup.sh`, et **révoque le NOPASSWD dans un `finally`** :
   il ne doit pas survivre à un échec de `setup.sh`.
-- `Set-PadawanParDefaut` — `/etc/wsl.conf` + `DefaultUid`, puis `--terminate`.
-- `Open-ConsoleDebian` — console interactive qui lance `nsi init`, ouvre VSCode
+- `Set-PadawanParDefaut`, `/etc/wsl.conf` + `DefaultUid`, puis `--terminate`.
+- `Open-ConsoleDebian`, console interactive qui lance `nsi init`, ouvre VSCode
   par `code "$(nsi dir)"`, puis laisse un shell (`exec bash -l`). Le `$` est
   échappé en `` `$ `` pour que PowerShell le laisse à bash.
 
@@ -174,7 +174,7 @@ créer un utilisateur Debian, écrire `/etc/wsl.conf` ou poser `DefaultUid` sous
 Le fichier est en UTF-8 **sans BOM**, et ça ne doit pas changer : `iex` sur une
 chaîne qui commence par un BOM échoue. Les accents sont sûrs malgré l'absence
 de BOM parce que GitHub raw sert `charset=utf-8` et que `irm` décode en
-conséquence — mesuré le 2026-09-11 sous Windows PowerShell 5.1.
+conséquence, mesuré le 2026-09-11 sous Windows PowerShell 5.1.
 
 ## setup.sh
 
@@ -183,20 +183,20 @@ Identique sur les trois plateformes, aucune condition de système à écrire.
 - Refuse de tourner en **root** : `curl … | sudo bash` poserait `nsi` dans
   `/root/.local/bin`, invisible pour l'élève, et casserait Homebrew sur macOS.
 - Dit ce qui va se passer : rester connecté à Internet, mot de passe possible
-  pour les paquets système. **Sans jamais attendre de saisie** — il est aussi
+  pour les paquets système. **Sans jamais attendre de saisie**, il est aussi
   appelé par `setup-windows.ps1` via `wsl -- bash -c "curl … | bash"`, sans
   terminal : un `read` bloquerait.
 - Installe `curl` s'il est absent (seul paquet système qu'il pose).
 - Télécharge `nsi` dans `~/.local/bin`, par renommage atomique.
 - **`assurer_path`** : garantit qu'un shell de connexion trouvera `nsi`.
   Sur Debian, `~/.profile` ajoute `~/.local/bin` *si le dossier existe*, et il
-  vient d'être créé — rien à faire. Sur **macOS**, le shell par défaut est zsh,
+  vient d'être créé, rien à faire. Sur **macOS**, le shell par défaut est zsh,
   qui ne lit pas `~/.profile` du tout : sans cette fonction, `nsi` ne serait
   jamais dans le PATH et le `nsi init` annoncé échouerait.
   - La sonde tourne sous `env -i` : sinon le shell de connexion hérite du PATH
     courant et répond « c'est bon » alors qu'un terminal neuf ne trouvera rien.
   - Écrit dans `~/.zprofile` sous zsh ; sinon `~/.bash_profile`, `~/.bash_login`
-    ou `~/.profile`, dans cet ordre — bash lit `~/.bash_profile` **à la place**
+    ou `~/.profile`, dans cet ordre, bash lit `~/.bash_profile` **à la place**
     de `~/.profile` quand il existe.
   - N'écrit rien si un shell de connexion résout déjà `nsi`, ni si le fichier
     mentionne déjà `.local/bin`.
@@ -207,8 +207,8 @@ Identique sur les trois plateformes, aucune condition de système à écrire.
   `/dev/tty`. Deux obstacles l'imposent : sous `curl … | bash` stdin est le
   tuyau de curl, et il n'y a pas toujours de terminal de contrôle. Le test est
   `(exec </dev/tty)`, pas `[ -e /dev/tty ]` : le fichier existe même quand
-  aucun terminal n'y répond. Sans terminal — le cas de l'appel depuis
-  `setup-windows.ps1` — il ne tente rien et indique `nsi init` comme étape
+  aucun terminal n'y répond. Sans terminal, le cas de l'appel depuis
+  `setup-windows.ps1`, il ne tente rien et indique `nsi init` comme étape
   suivante : c'est la console ouverte par `Open-ConsoleDebian` qui s'en charge,
   et c'est là que l'élève peut taper.
 
@@ -228,7 +228,7 @@ Script shell unique, auto-contenu.
   `sudo nsi install base`). Sur macOS il s'arrête et le dit : Homebrew refuse
   d'être lancé en root et casserait en silence.
 - `nsi update` retélécharge le script, remplace `$INSTALL_PATH` et termine
-  immédiatement (`exit 0`) — il ne faut pas relire un fichier qu'on remplace.
+  immédiatement (`exit 0`), il ne faut pas relire un fichier qu'on remplace.
 
 ### VSCode : la frontière
 
@@ -250,14 +250,14 @@ porte cette décision.
 - vscode (ignoré sous WSL)
 
 ### autres composants (installables individuellement)
-- `gleam` — Gleam + Erlang
-- `postgresql` — configuration développeur sans sécurité, superuser `dev`/`dev`
-- `openjdk` — JDK complet
-- `nasm` — assembleur x86
-- `rust` — via rustup, dans `/usr/local/rustup` et `/usr/local/cargo`
+- `gleam`, Gleam + Erlang
+- `postgresql`, configuration développeur sans sécurité, superuser `dev`/`dev`
+- `openjdk`, JDK complet
+- `nasm`, assembleur x86
+- `rust`, via rustup, dans `/usr/local/rustup` et `/usr/local/cargo`
   (accessible à tous les utilisateurs), binaires symlinkés dans `/usr/local/bin`
-- `prolog` — SWI-Prolog (`swipl`)
-- `c` — GCC/G++/Make/GDB (`build-essential gdb` sur Debian, `gcc gcc-c++ make
+- `prolog`, SWI-Prolog (`swipl`)
+- `c`, GCC/G++/Make/GDB (`build-essential gdb` sur Debian, `gcc gcc-c++ make
   gdb` sur Fedora, Xcode CLT + `gdb` sur macOS)
 
 ## Interface
@@ -302,18 +302,18 @@ dépôts, dépôt-modèle. Ce dépôt-ci ne contient aucun outil d'administratio
 
 ### Convention de nommage
 
-**Contrat partagé avec metatest, documenté à l'identique des deux côtés** —
+**Contrat partagé avec metatest, documenté à l'identique des deux côtés** -
 metatest l'écrit (`nom_equipe`/`nom_depot` dans `outils/equipe_github.py`),
 `nsi init` le relit. Deux dépôts distincts, rien ne les synchronise : une
 modification d'un côté est à répercuter à la main de l'autre.
 
 - **Année scolaire** : `AAAA-AAAA+1`, bascule le 1ᵉʳ août. Ex. `2026-2027`.
-- **Équipe** : `<classe>_<année>` — ex. `1G3_2026-2027`. Le nom de classe est
+- **Équipe** : `<classe>_<année>`, ex. `1G3_2026-2027`. Le nom de classe est
   celui de metatest, sans transformation ; les classes reviennent chaque année
   sous le même nom, l'année désambiguïse.
-- **Dépôt élève** : `<équipe>-<compte>` — ex. `1G3_2026-2027-Marie-Dupont`.
+- **Dépôt élève** : `<équipe>-<compte>`, ex. `1G3_2026-2027-Marie-Dupont`.
   Un dépôt neuf par inscription, même pour un élève qui repasse une autre année.
-- **Dossier local** : `~/<équipe>`, jamais `~/<pseudo>` — jamais de collision
+- **Dossier local** : `~/<équipe>`, jamais `~/<pseudo>`, jamais de collision
   avec un ancien clone.
 - **Caractères autorisés** : alphanumériques ASCII, `.`, `_`, `-` uniquement,
   validé côté écriture par `nom_depot()`.
@@ -338,7 +338,7 @@ cours, avec bascule au 1ᵉʳ août, et cherchait une équipe finissant par
 `_<année>` via `/user/teams`. Trois défauts : échec net si la classe était
 créée en avance ou en retard sur ce calendrier, noms d'équipe non triables (une
 vieille `Term2425` ne finit même pas par une année), et la portée `read:org`
-imposée au jeton — c'était le seul appel qui la réclamait. La date de création
+imposée au jeton, c'était le seul appel qui la réclamait. La date de création
 des dépôts, elle, tranche sans convention supplémentaire.
 
 **Le filtrage se fait en shell, pas en jq.** `gh api --jq` **n'accepte pas
@@ -347,7 +347,7 @@ des dépôts, elle, tranche sans convention supplémentaire.
 qui cassait la recherche d'équipe : avec `set -euo pipefail`, `nsi init`
 mourait sur « unknown flag: --arg », avant même son message d'erreur. Le filtre
 est donc un `awk`, choisi plutôt qu'un `grep` parce qu'il rend 0 même sans
-correspondance — un `grep` muet ferait échouer l'affectation sous `pipefail` —
+correspondance, un `grep` muet ferait échouer l'affectation sous `pipefail` -
 et les classes de chiffres y sont écrites en clair, les intervalles `{4}`
 n'étant pas garantis par tous les `awk`.
 
@@ -356,7 +356,7 @@ n'étant pas garantis par tous les `awk`.
   ne rend l'email que s'il est public (rare), et lire l'email privé exigerait
   la portée `user:email` en plus.
 - `gh auth login --with-token` n'authentifie que `gh`. `gh auth setup-git` est
-  appelé juste après pour l'enregistrer comme credential helper — sans ça,
+  appelé juste après pour l'enregistrer comme credential helper, sans ça,
   `nsi push`/`nsi pull`, qui appellent `git` directement, ne le seraient pas.
 
 Clone ensuite le dépôt dans `~/<équipe>`, lance `uv sync`, ouvre VSCode.
@@ -377,7 +377,7 @@ le dernier y déversait `.vscode/`, `pyproject.toml` et `.gitignore`.
 Le chemin est donc **mémorisé** par `nsi init` dans `~/.config/nsi/dossier`, et
 les trois commandes commencent par `aller_dans_le_depot`. Une variable shell ne
 suffirait pas : chaque `nsi` est un nouveau processus. Et le recalculer
-demanderait un appel à l'API GitHub — réseau et authentification — à chaque
+demanderait un appel à l'API GitHub, réseau et authentification, à chaque
 `nsi push`.
 
 - `nsi init` n'écrit le chemin que si `<dossier>/.git` existe : un clone échoué
@@ -403,5 +403,5 @@ les écrase. Commande explicite, avec avertissement à l'élève : elle réiniti
 
 ### `nsi push` / `nsi pull`
 
-`git add -A && git commit -m "Sauvegarde du <date>" && git push` — sans erreur
+`git add -A && git commit -m "Sauvegarde du <date>" && git push`, sans erreur
 si rien n'a changé. Et `git pull`.

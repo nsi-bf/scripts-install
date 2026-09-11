@@ -11,7 +11,7 @@ encore, c'est `nsi init` qui le lui fera créer.
 **public**. Une visibilité « membres de l'organisation » ne suffit pas : elle
 exige une authentification que `curl` n'a pas.
 
-## setup-windows.ps1 — Windows uniquement
+## setup-windows.ps1, Windows uniquement
 
 Rôle unique : fabriquer une machine Linux utilisable, puis passer la main.
 
@@ -33,7 +33,7 @@ devant un prompt nu, sans rien lui dire quoi taper. Une commande à ne pas
 saisir vaut mieux qu'une frontière pure : la règle porte sur qui installe quoi,
 pas sur qui prononce un nom.
 
-## setup.sh — WSL, Linux, macOS
+## setup.sh, WSL, Linux, macOS
 
 Rôle unique : installer l'environnement élève sur un Linux quelconque.
 
@@ -44,7 +44,7 @@ Rôle unique : installer l'environnement élève sur un Linux quelconque.
 
 Identique sur les trois plateformes : aucune condition à écrire.
 
-## nsi — l'outil
+## nsi, l'outil
 
 Installé dans `~/.local/bin/nsi` (`INSTALL_PATH`). Ni son installation ni sa
 mise à jour n'exigent `sudo`.
@@ -72,7 +72,7 @@ porte cette décision : si VS Code devait un jour être installé sous WSL côt�
 Linux, c'est cette ligne qu'il faudrait changer, pas les scripts.
 
 La contrepartie est que sous WSL, le `code` qu'appelle `nsi init` est celui de
-l'installation Windows, atteint par l'interop — et il n'ouvre le dossier Linux
+l'installation Windows, atteint par l'interop, et il n'ouvre le dossier Linux
 que si l'extension `ms-vscode-remote.remote-wsl` est installée côté Windows.
 `setup-windows.ps1` la pose dans ses deux branches pour cette raison.
 
@@ -82,13 +82,13 @@ que si l'extension `ms-vscode-remote.remote-wsl` est installée côté Windows.
 
 Pas de `tasks.json` : il portait un `nsi pull` automatique à l'ouverture du
 dépôt. Un geste que l'élève n'a pas demandé, qu'il ne voit pas passer et qu'il
-ne saurait pas défaire — `nsi pull` est une commande qu'il tape.
+ne saurait pas défaire, `nsi pull` est une commande qu'il tape.
 
 Ils ne sont plus dans ce dépôt (fait le 2026-09-11). Ils vivent dans le
 dépôt-modèle `nsi-bf/template-eleves`, dont chaque dépôt d'élève est engendré :
 c'est la seule source.
 
-`nsi init` ne déploie donc plus rien — il clone, `uv sync`, ouvre VS Code. Il
+`nsi init` ne déploie donc plus rien, il clone, `uv sync`, ouvre VS Code. Il
 n'écrase plus le travail de l'élève à chaque appel, ce qu'il faisait quand il
 tirait ces fichiers par `curl`.
 
