@@ -669,9 +669,18 @@ cmd_init() {
 
     if [[ -z "$depots" ]]; then
         echo "Aucun dépôt de cours trouvé pour $pseudo dans $GITHUB_ORG." >&2
-        echo "Vérifie que tu as accepté les invitations reçues par email" >&2
-        echo "(organisation, puis dépôt), et que ton prof a bien mis en place" >&2
-        echo "ta classe." >&2
+        echo "" >&2
+        echo "Le plus souvent, c'est qu'il reste des invitations à accepter." >&2
+        echo "Connecte-toi sur GitHub avec le compte $pseudo, puis :" >&2
+        echo "" >&2
+        echo "  1. accepte l'invitation à l'organisation :" >&2
+        echo "     https://github.com/orgs/$GITHUB_ORG/invitation" >&2
+        echo "  2. accepte ensuite celle de ton dépôt : elle apparaît sur" >&2
+        echo "     https://github.com/notifications, ou dans tes courriels." >&2
+        echo "" >&2
+        echo "Relance ensuite : nsi init" >&2
+        echo "Si le problème persiste, ton prof n'a pas encore mis en place" >&2
+        echo "ta classe : demande-lui." >&2
         exit 1
     fi
 
