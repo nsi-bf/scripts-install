@@ -44,13 +44,30 @@ débutants.
 **source unique** des fichiers de configuration de l'élève — ne pas les
 dupliquer dans `scripts-install`.
 
-- Semé la première fois depuis `metatest/outils/modele/`.
-- Une fois qu'il existe, **c'est lui qui fait foi** : on le corrige sur
-  github.com ou par `git`, pas dans `outils/modele/`.
-- Un dépôt engendré depuis un modèle n'a pas de lien avec lui : GitHub ne sait
-  pas propager une correction. C'est `--rafraichir` (§5) qui le fait.
-- `nsi settings` y lit les mêmes fichiers, avec le jeton de l'élève
-  (`TEMPLATE_REPO` dans [`nsi`](nsi)).
+**Son contenu se règle à part, à la main.** `settings.json` et `pyproject.toml`
+sont mis au point dépôt par dépôt, et la version en vigueur est celle de
+`nsi-bf/TEST_2025-2026-NSI-eleve`. Ni ce dépôt-ci ni metatest ne sont la source
+de ces fichiers.
+
+Ce que metatest fait, et ne fait pas :
+
+- il **crée** le dépôt-modèle s'il n'existe pas, et y pose les fichiers de
+  `outils/modele/` — une amorce, pour qu'un modèle neuf ne soit pas vide ;
+- il ne **réécrit jamais** un fichier déjà présent dans le modèle
+  (`assurer_modele` : `if present and not neuf: continue`). Le réglage à la main
+  ne risque rien ;
+- **le seul piège** : un fichier présent dans `outils/modele/` et retiré
+  volontairement du modèle y serait reposé au prochain passage. Retirer un
+  fichier du modèle pour de bon, c'est aussi le retirer de `outils/modele/` ;
+- `--rafraichir` (§5) lit le modèle **sur GitHub**, pas `outils/modele/` : c'est
+  bien la version réglée à la main qui se propage aux dépôts d'élèves.
+
+Un dépôt engendré depuis un modèle n'a aucun lien avec lui : GitHub ne sait pas
+propager une correction, d'où `--rafraichir`.
+
+`nsi settings` lit les mêmes fichiers dans ce dépôt, avec le jeton de l'élève
+(`TEMPLATE_FICHIERS` et `TEMPLATE_REPO` dans [`nsi`](nsi)). Ces quatre chemins
+doivent donc exister dans le modèle.
 
 ## 4. Inscrire une classe
 
