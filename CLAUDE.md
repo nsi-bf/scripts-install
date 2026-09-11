@@ -22,10 +22,14 @@ jeton, l'élève n'en a pas encore.
 
 ## Points d'entrée
 
-**Windows** (cmd.exe ou PowerShell) :
+**Windows**, dans **PowerShell** (pas `cmd`) :
 ```
-powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex"
+irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex
 ```
+
+Pas de `powershell -ExecutionPolicy Bypass -c` devant : on est déjà dans
+PowerShell, et la politique d'exécution ne s'applique pas à `iex`, qui reçoit
+une chaîne et non un fichier. Moins de caractères à coller pour un débutant.
 
 **Mac / Linux** :
 ```
@@ -33,6 +37,17 @@ curl -fsSL https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup.s
 ```
 
 Servis depuis GitHub raw (branche `main`), sans releases à gérer.
+
+**PowerShell et pas `cmd`** : depuis `cmd`, le détecteur de menaces de Windows
+refuse la commande (« accès refusé », constaté sur un poste de test le
+2026-09-11). `irm … | iex` exécute du code téléchargé en mémoire, sans jamais
+l'écrire sur disque : c'est le motif des chargeurs de logiciels malveillants,
+donc ce que l'AMSI et les règles ASR surveillent en premier. Le processus
+parent entre dans l'heuristique, d'où la différence entre les deux shells.
+
+Si le blocage se produit aussi depuis PowerShell sur d'autres postes, la piste
+est d'écrire le script sur disque avant de l'exécuter plutôt que de le passer à
+`iex` : un fichier posé puis lancé sort de ces heuristiques. Non testé.
 
 ## setup-windows.ps1
 

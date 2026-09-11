@@ -1,6 +1,11 @@
 # Amorçage Windows de l'environnement NSI.
 #
-#   powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex"
+#   irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex
+#
+# A coller dans PowerShell, pas dans cmd : depuis cmd, le detecteur de menaces
+# de Windows refuse la commande. L'execution en memoire de code telecharge est
+# le motif des chargeurs de logiciels malveillants, et le processus parent
+# entre dans l'heuristique.
 #
 # Rôle unique : fabriquer une machine Linux utilisable, puis passer la main à
 # setup.sh. Ce script n'installe aucun outil pédagogique : ni nsi, ni uv, ni

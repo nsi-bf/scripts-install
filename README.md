@@ -1,17 +1,21 @@
-# NSI Dev, Ton environnement de développement
+# NSI Dev : ton environnement de développement
 
 Bienvenue ! Ces instructions te permettent d'installer en quelques minutes tout ce dont tu as besoin pour coder en NSI.
 
 ---
 
-## Etape 1, Installation
+## Etape 1 : installation
 
 ### Windows
 
-Ouvre **cmd.exe** ou **PowerShell** et colle cette commande :
+Ouvre **PowerShell** et colle cette commande :
+
+> Menu Démarrer, tape `powershell`, puis ouvre **Windows PowerShell**.
+> Pas l'invite de commandes `cmd` : le détecteur de menaces de Windows y
+> bloque l'installation.
 
 ```
-powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex"
+irm https://raw.githubusercontent.com/nsi-bf/scripts-install/main/setup-windows.ps1 | iex
 ```
 
 > Si l'installation te demande de redémarrer, fais-le puis relance exactement la même commande.
@@ -30,7 +34,7 @@ Quand c'est fini, **ouvre un nouveau terminal** avant de passer à la suite.
 
 ---
 
-## Etape 2, Créer un compte GitHub
+## Etape 2 : créer un compte GitHub
 
 Rends-toi sur [https://github.com/join](https://github.com/join) et crée un compte.
 
@@ -38,7 +42,7 @@ Rends-toi sur [https://github.com/join](https://github.com/join) et crée un com
 
 ---
 
-## Etape 3, Configurer ton compte GitHub
+## Etape 3 : configurer ton compte GitHub
 
 Ouvre **VSCode**, puis ouvre un terminal intégré (`Terminal > Nouveau terminal` ou `Ctrl+ù`).
 
@@ -58,7 +62,7 @@ Une fois terminé, **VSCode s'ouvre automatiquement** dans ton dépôt. C'est l�
 
 ---
 
-## Etape 4, Sauvegarder et récupérer ton travail
+## Etape 4 : sauvegarder et récupérer ton travail
 
 ### Sauvegarder
 

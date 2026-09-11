@@ -11,7 +11,7 @@ encore, c'est `nsi init` qui le lui fera créer.
 **public**. Une visibilité « membres de l'organisation » ne suffit pas : elle
 exige une authentification que `curl` n'a pas.
 
-## setup-windows.ps1, Windows uniquement
+## setup-windows.ps1 : Windows uniquement
 
 Rôle unique : fabriquer une machine Linux utilisable, puis passer la main.
 
@@ -33,7 +33,7 @@ devant un prompt nu, sans rien lui dire quoi taper. Une commande à ne pas
 saisir vaut mieux qu'une frontière pure : la règle porte sur qui installe quoi,
 pas sur qui prononce un nom.
 
-## setup.sh, WSL, Linux, macOS
+## setup.sh : WSL, Linux, macOS
 
 Rôle unique : installer l'environnement élève sur un Linux quelconque.
 
@@ -44,7 +44,7 @@ Rôle unique : installer l'environnement élève sur un Linux quelconque.
 
 Identique sur les trois plateformes : aucune condition à écrire.
 
-## nsi, l'outil
+## nsi : l'outil
 
 Installé dans `~/.local/bin/nsi` (`INSTALL_PATH`). Ni son installation ni sa
 mise à jour n'exigent `sudo`.
