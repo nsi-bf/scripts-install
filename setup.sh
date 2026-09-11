@@ -145,7 +145,20 @@ echo ""
 if (exec </dev/tty) 2>/dev/null; then
     echo "Installation terminée. Configuration de ton compte GitHub."
     echo ""
-    "$INSTALL_PATH" init </dev/tty
+
+    # On ne va pas plus loin tant que ce n'est pas fait. `nsi init` retente
+    # lui-même le jeton et la recherche du dépôt ; s'il sort quand même en
+    # erreur, c'est quelque chose qu'il ne sait pas rattraper, et on redonne la
+    # main plutôt que d'ouvrir VSCode sur un dossier qui n'existe pas.
+    while ! "$INSTALL_PATH" init </dev/tty; do
+        echo ""
+        echo "La configuration a échoué."
+        echo ""
+        if ! read -rp "Appuie sur Entrée pour réessayer (Ctrl+C pour abandonner) " </dev/tty; then
+            echo "Abandon." >&2
+            exit 1
+        fi
+    done
 
     # Ouvrir VSCode est une commodité d'amorçage : c'est ici qu'elle a sa
     # place, pas dans `nsi init`, qui se contente de configurer et de cloner.

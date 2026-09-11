@@ -627,17 +627,51 @@ cmd_init() {
     echo "=============================="
     echo ""
 
-    echo "Il te faut un token d'accès personnel GitHub."
-    echo "Pour en créer un :"
-    echo "  1. Va sur https://github.com/settings/tokens"
-    echo "  2. Clique sur 'Generate new token (classic)'"
-    echo "  3. Donne-lui un nom (ex: 'NSI') et coche les portées 'repo',"
-    echo "     'read:org' et 'gist'"
-    echo "  4. Clique sur 'Generate token' et copie-le IMMEDIATEMENT
+    # On boucle jusqu'à ce que gh accepte le jeton. Un débutant se trompe de
+    # portée, colle un jeton tronqué ou expiré : lui rendre la main plutôt que
+    # de le laisser devant un script mort.
+    #
+    # `read` qui échoue interrompt la boucle : sans terminal il rend EOF
+    # immédiatement, et on tournerait sans fin sans que personne ne puisse
+    # répondre.
+    local github_token
+    while true; do
+        echo "Il te faut un token d'accès personnel GitHub."
+        echo "Pour en créer un :"
+        echo "  1. Va sur https://github.com/settings/tokens"
+        echo "  2. Clique sur 'Generate new token (classic)'"
+        echo "  3. Donne-lui un nom (ex: 'NSI') et coche les portées 'repo',"
+        echo "     'read:org' et 'gist'"
+        echo "  4. Clique sur 'Generate token' et copie-le IMMEDIATEMENT
      ATTENTION : le token ne s'affiche qu'une seule fois, il sera impossible de le retrouver ensuite !"
-    echo ""
-    read -rp "Token GitHub : " github_token
-    echo "$github_token" | gh auth login --with-token
+        echo ""
+        if ! read -rp "Token GitHub : " github_token; then
+            echo "" >&2
+            echo "Erreur : impossible de lire ta réponse (pas de terminal)." >&2
+            echo "Ouvre un terminal et lance : nsi init" >&2
+            exit 1
+        fi
+
+        if [[ -z "$github_token" ]]; then
+            echo ""
+            echo "Tu n'as rien collé. On recommence."
+            echo ""
+            continue
+        fi
+
+        if printf '%s\n' "$github_token" | gh auth login --with-token; then
+            break
+        fi
+
+        echo ""
+        echo "Ce token n'a pas été accepté. Les causes les plus fréquentes :"
+        echo "  - il manque une portée : il faut 'repo', 'read:org' ET 'gist'"
+        echo "  - le token a été mal collé, ou tronqué"
+        echo "  - il a expiré, ou tu l'as révoqué"
+        echo ""
+        echo "Crée-en un nouveau et recommence."
+        echo ""
+    done
 
     # Idempotent, et hors du test : `gh auth login` n'authentifie que `gh`,
     # pas `git`. Sans cet enregistrement de `gh` comme credential helper,
@@ -687,26 +721,37 @@ cmd_init() {
     # par tous les awk.
     local depots repo_name equipe motif
     motif="^${GITHUB_ORG}/[A-Za-z0-9._-]+_[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]-${pseudo//./\\.}$"
-    depots="$(gh api "/user/repos?per_page=100" --paginate \
-        --jq '.[] | [.created_at, .full_name] | @tsv' \
-        | awk -v motif="$motif" '$2 ~ motif' | sort -r)"
 
-    if [[ -z "$depots" ]]; then
-        echo "Aucun dépôt de cours trouvé pour $pseudo dans $GITHUB_ORG." >&2
-        echo "" >&2
-        echo "Le plus souvent, c'est qu'il reste des invitations à accepter." >&2
-        echo "Connecte-toi sur GitHub avec le compte $pseudo, puis :" >&2
-        echo "" >&2
-        echo "  1. accepte l'invitation à l'organisation :" >&2
-        echo "     https://github.com/orgs/$GITHUB_ORG/invitation" >&2
-        echo "  2. accepte ensuite celle de ton dépôt : elle apparaît sur" >&2
-        echo "     https://github.com/notifications, ou dans tes courriels." >&2
-        echo "" >&2
-        echo "Relance ensuite : nsi init" >&2
-        echo "Si le problème persiste, ton prof n'a pas encore mis en place" >&2
-        echo "ta classe : demande-lui." >&2
-        exit 1
-    fi
+    # On boucle jusqu'à trouver le dépôt. Accepter une invitation prend dix
+    # secondes : autant laisser l'élève le faire et réessayer, plutôt que de
+    # l'obliger à relancer toute l'installation.
+    while true; do
+        depots="$(gh api "/user/repos?per_page=100" --paginate \
+            --jq '.[] | [.created_at, .full_name] | @tsv' \
+            | awk -v motif="$motif" '$2 ~ motif' | sort -r)"
+        [[ -n "$depots" ]] && break
+
+        echo ""
+        echo "Aucun dépôt de cours trouvé pour $pseudo dans $GITHUB_ORG."
+        echo ""
+        echo "Le plus souvent, c'est qu'il reste des invitations à accepter."
+        echo "Connecte-toi sur GitHub avec le compte $pseudo, puis :"
+        echo ""
+        echo "  1. accepte l'invitation à l'organisation :"
+        echo "     https://github.com/orgs/$GITHUB_ORG/invitation"
+        echo "  2. accepte ensuite celle de ton dépôt : elle apparaît sur"
+        echo "     https://github.com/notifications, ou dans tes courriels."
+        echo ""
+        echo "Si rien n'y fait, ton prof n'a pas encore mis en place ta classe :"
+        echo "demande-lui."
+        echo ""
+
+        if ! read -rp "Appuie sur Entrée quand c'est fait (Ctrl+C pour abandonner) "; then
+            echo "" >&2
+            echo "Erreur : impossible de lire ta réponse (pas de terminal)." >&2
+            exit 1
+        fi
+    done
 
     repo_name="$(head -n1 <<< "$depots" | cut -f2)"
     repo_name="${repo_name#"$GITHUB_ORG/"}"

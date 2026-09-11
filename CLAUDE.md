@@ -465,6 +465,23 @@ lancer un éditeur est une commodité de première mise en route, pas le travail
 d'une commande qui configure et clone. `setup.sh` le fait sur Mac et Linux,
 `Open-ConsoleDebian` sur Windows.
 
+### Rien n'avance tant que `nsi init` n'a pas abouti
+
+Un débutant se trompe de portée, colle un jeton tronqué, ou n'a pas accepté ses
+invitations. Chacun de ces cas tuait l'installation et l'obligeait à tout
+relancer. Trois boucles l'évitent :
+
+- **le jeton** : tant que `gh auth login --with-token` refuse, on réexplique
+  les trois portées et on redemande ;
+- **le dépôt** : tant qu'aucun ne correspond, on affiche les URL des
+  invitations et on attend une touche pour réessayer ;
+- **`setup.sh`** : `while ! nsi init`, il n'ouvre pas VSCode sur un dossier
+  inexistant.
+
+Chaque boucle se termine si `read` échoue. Sans terminal il rend EOF
+immédiatement, et on tournerait sans fin sans que personne ne puisse répondre :
+vérifié, la boucle rend la main au lieu de s'emballer.
+
 ### `nsi reset-config`
 
 Retélécharge les fichiers de configuration depuis `nsi-bf/template-eleves` et
