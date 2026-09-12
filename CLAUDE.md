@@ -333,7 +333,7 @@ nsi push          # commit horodaté + push
 nsi pull          # pull
 nsi dir           # imprime le dossier de cours, pour `code "$(nsi dir)"`
 nsi reset-config  # remet la configuration du projet à celle du modèle
-nsi toggle-config # bascule l'affichage des fichiers de config dans VSCode
+nsi toggle-config # bascule l'affichage des fichiers listés par files.exclude
 ```
 
 ## Structure du repo

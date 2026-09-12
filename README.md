@@ -105,7 +105,7 @@ GitHub remplace la clé USB. Tes fichiers y sont stockés en ligne, accessibles 
 | `nsi push` | Sauvegarde et envoie ton travail sur GitHub |
 | `nsi pull` | Récupère la dernière version depuis GitHub |
 | `nsi reset-config` | Remet la configuration du projet à la version du prof (efface tes `uv add`) |
-| `nsi toggle-config` | Cache ou réaffiche les fichiers de configuration dans VSCode |
+| `nsi toggle-config` | Cache ou réaffiche dans VSCode les fichiers listés par `files.exclude` |
 | `nsi dir` | Affiche le chemin de ton dossier de cours |
 | `nsi update` | Met à jour l'outil `nsi` |
 | `nsi install <composant>` | Installe un composant supplémentaire |

@@ -482,20 +482,122 @@ remove_rust() {
 # --- hide ---
 
 cmd_toggle_config() {
+    # Comme reset-config : la commande agit sur le dépôt, pas sur le dossier
+    # courant. Sans cela, lancée depuis ~ ou depuis un sous-dossier, elle
+    # répondait « Lance nsi init d'abord » alors que init avait été fait.
+    aller_dans_le_depot
     local settings=".vscode/settings.json"
-    [[ -f "$settings" ]] || { echo "Fichier $settings introuvable. Lance nsi init d'abord." >&2; exit 1; }
+    [[ -f "$settings" ]] || { echo "Fichier $settings introuvable. Lance nsi reset-config." >&2; exit 1; }
     python3 - "$settings" <<'EOF'
-import json, sys
-path = sys.argv[1]
-with open(path) as f:
-    data = json.load(f)
-exclude = data.get("files.exclude", {})
-new_val = not all(v is True for v in exclude.values())
-data["files.exclude"] = {k: new_val for k in exclude}
-with open(path, "w") as f:
-    json.dump(data, f, indent=2, ensure_ascii=False)
-    f.write("\n")
-print("Fichiers " + ("masqués" if new_val else "affichés") + " dans l'Explorer VSCode.")
+import sys
+
+# Un settings.json de VSCode est du JSONC : il porte des commentaires, et
+# `json.load` les REFUSE. C'est ce que faisait cette commande, et elle échouait
+# donc sur le settings.json du modèle lui-même, qui est commenté ligne à ligne
+# (JSONDecodeError, et `set -euo pipefail` tuait nsi avec).
+#
+# Elle réécrivait de surcroît le fichier entier par `json.dump`, ce qui
+# effaçait tous les commentaires et changeait l'indentation : un fichier
+# pédagogique perdait ses explications au premier appel.
+#
+# On ne parse donc plus le fichier. On le parcourt une fois pour situer la
+# VALEUR de `files.exclude`, et on ne réécrit que les vrai/faux qu'elle
+# contient. Tout le reste ressort octet pour octet, quoi que le fichier
+# contienne.
+chemin = sys.argv[1]
+CLE = '"files.exclude"'
+
+t = open(chemin, encoding="utf-8").read()
+n = len(t)
+
+i = 0
+etat = "cherche"    # cherche la clé, puis attend son '{', puis dans le bloc
+profondeur = 0      # imbrication à l'intérieur du bloc
+booleens = []       # positions des vrai/faux de PREMIER niveau
+fin_bloc = None
+
+while i < n:
+    c = t[i]
+
+    # Commentaires : ils peuvent contenir n'importe quoi, jusqu'à une accolade
+    # ou le mot « true ». On les saute sans les lire.
+    if c == "/" and t.startswith("//", i):
+        j = t.find("\n", i)
+        i = n if j == -1 else j
+        continue
+    if c == "/" and t.startswith("/*", i):
+        j = t.find("*/", i + 2)
+        i = n if j == -1 else j + 2
+        continue
+
+    # Chaînes : sautées d'un bloc, échappements compris. C'est aussi là qu'on
+    # reconnaît la clé, donc un "files.exclude" écrit dans un commentaire ou
+    # comme valeur ne peut pas être pris pour elle.
+    if c == '"':
+        j = i + 1
+        while j < n:
+            if t[j] == "\\":
+                j += 2
+                continue
+            if t[j] == '"':
+                break
+            j += 1
+        if etat == "cherche" and t[i:j + 1] == CLE:
+            etat = "attend"
+        i = j + 1
+        continue
+
+    if etat == "attend":
+        if c == "{":
+            etat = "dans"
+        elif c not in " \t\r\n:":
+            # La clé n'était pas suivie d'un objet : ce n'est pas le réglage
+            # qu'on cherche, on repart en chasse.
+            etat = "cherche"
+        i += 1
+        continue
+
+    if etat == "dans":
+        if c in "{[":
+            profondeur += 1
+        elif c == "]":
+            profondeur -= 1
+        elif c == "}":
+            if profondeur == 0:
+                fin_bloc = i
+                break
+            profondeur -= 1
+        elif profondeur == 0:
+            # Seuls les booléens de premier niveau sont des états « masqué ».
+            # Plus bas, on est dans un motif conditionnel VSCode
+            # ({"when": ...}), dont le contenu ne se bascule pas.
+            for mot in ("true", "false"):
+                if t.startswith(mot, i):
+                    booleens.append((i, i + len(mot)))
+                    i += len(mot)
+                    break
+            else:
+                i += 1
+            continue
+    i += 1
+
+if fin_bloc is None:
+    print('Aucun réglage "files.exclude" dans ' + chemin + " : rien à basculer.")
+    raise SystemExit(0)
+
+if not booleens:
+    print('Le réglage "files.exclude" de ' + chemin + " ne liste aucun fichier.")
+    raise SystemExit(0)
+
+tout_masque = all(t[a:b] == "true" for a, b in booleens)
+cible = "false" if tout_masque else "true"
+
+for a, b in reversed(booleens):
+    t = t[:a] + cible + t[b:]
+
+open(chemin, "w", encoding="utf-8").write(t)
+print("Fichiers " + ("affichés" if tout_masque else "masqués")
+      + " dans l'explorateur VSCode.")
 EOF
 }
 
