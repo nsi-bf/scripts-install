@@ -375,6 +375,11 @@ modification d'un côté est à répercuter à la main de l'autre.
   sous le même nom, l'année désambiguïse.
 - **Dépôt élève** : `<équipe>-<compte>`, ex. `1G3_2026-2027-Marie-Dupont`.
   Un dépôt neuf par inscription, même pour un élève qui repasse une autre année.
+  **`<compte>` est le login tel que GitHub l'écrit, casse comprise** : metatest
+  le lit sur GitHub avant de nommer le dépôt, et renomme un dépôt engendré sous
+  une autre casse. `nsi init` compare quand même sans égard à la casse, pour les
+  dépôts nommés avant cette règle (constaté le 2026-09-14 : `Tim7-CR` saisi,
+  `Tim7-cr` écrit par GitHub, élève bloqué sur « Aucun dépôt de cours trouvé »).
 - **Dossier local** : `~/<équipe>`, jamais `~/<pseudo>`, jamais de collision
   avec un ancien clone.
 - **Caractères autorisés** : alphanumériques ASCII, `.`, `_`, `-` uniquement,
@@ -396,9 +401,12 @@ ne servent plus depuis l'abandon de `/user/teams`.
 
 Ne demande ni classe ni nom de dépôt. Il lit le pseudo (`gh api user`), liste
 les dépôts auxquels l'élève a accès (`gh api /user/repos`), garde ceux qui
-suivent la convention `<classe>_<AAAA-AAAA>-<pseudo>` dans `nsi-bf`, et prend
-**le plus récent** par date de création. L'équipe s'en déduit en retirant le
-suffixe `-<pseudo>`, et donne le nom du dossier local. Si rien ne correspond
+suivent la convention `<classe>_<AAAA-AAAA>-<pseudo>` dans `nsi-bf`, **sans
+égard à la casse**, et prend **le plus récent** par date de création. L'équipe
+s'en déduit en retirant le suffixe `-<pseudo>` **par sa longueur**, et donne le
+nom du dossier local : `${repo_name%-"$pseudo"}` respecterait la casse, ne
+retirerait rien sur `-Tim7-CR` pour le pseudo `Tim7-cr`, et clonerait dans
+`~/<nom du dépôt>`. Si rien ne correspond
 (élève pas encore inscrit, invitations pas acceptées, classe pas encore mise en
 place), affiche une erreur et s'arrête sans rien créer.
 

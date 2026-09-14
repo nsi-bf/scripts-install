@@ -845,6 +845,13 @@ cmd_init() {
     # muet ferait échouer l'affectation sous `pipefail`. Et les classes de
     # chiffres sont écrites en clair, les intervalles {4} n'étant pas garantis
     # par tous les awk.
+    #
+    # La comparaison ignore la casse, parce que GitHub l'ignore : `Tim7-CR` et
+    # `Tim7-cr` sont le même compte, mais `gh api user` n'en rend qu'une
+    # écriture, et un dépôt nommé d'après une autre restait introuvable. Constaté
+    # le 2026-09-14 sur un élève bloqué à « Aucun dépôt de cours trouvé ».
+    # metatest nomme désormais les dépôts avec la casse de GitHub ; ceci couvre
+    # les dépôts nommés avant.
     local depots repo_name equipe motif
     motif="^${GITHUB_ORG}/[A-Za-z0-9._-]+_[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]-${pseudo//./\\.}$"
 
@@ -854,7 +861,7 @@ cmd_init() {
     while true; do
         depots="$(gh api "/user/repos?per_page=100" --paginate \
             --jq '.[] | [.created_at, .full_name] | @tsv' \
-            | awk -v motif="$motif" '$2 ~ motif' | sort -r)"
+            | awk -v motif="$motif" 'tolower($2) ~ tolower(motif)' | sort -r)"
         [[ -n "$depots" ]] && break
 
         echo ""
@@ -882,8 +889,12 @@ cmd_init() {
     repo_name="$(head -n1 <<< "$depots" | cut -f2)"
     repo_name="${repo_name#"$GITHUB_ORG/"}"
     # L'équipe est le nom du dépôt privé de son suffixe : elle donne le nom du
-    # dossier local, distinct d'une année sur l'autre.
-    equipe="${repo_name%-"$pseudo"}"
+    # dossier local, distinct d'une année sur l'autre. Le suffixe se retire par
+    # sa longueur et non par `%-"$pseudo"`, qui respecte la casse : le filtre
+    # ci-dessus l'ignore, et le dépôt peut donc finir par `-Tim7-CR` quand le
+    # pseudo est `Tim7-cr`. Le filtre garantit que les ${#pseudo}+1 derniers
+    # caractères sont bien `-<pseudo>`.
+    equipe="${repo_name:0:$(( ${#repo_name} - ${#pseudo} - 1 ))}"
 
     local dossier="$HOME/${equipe:?}"
 

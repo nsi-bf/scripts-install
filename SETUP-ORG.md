@@ -95,7 +95,7 @@ classe, création de son dépôt depuis le modèle, ajout en collaborateur
 |---|---|
 | Année scolaire | `AAAA-AAAA+1`, bascule le 1ᵉʳ août |
 | Équipe | `<classe>_<année>`, `1G3_2026-2027` |
-| Dépôt élève | `<équipe>-<compte>`, `1G3_2026-2027-Marie-Dupont` |
+| Dépôt élève | `<équipe>-<compte>`, `1G3_2026-2027-Marie-Dupont`, le compte écrit comme GitHub l'écrit |
 | Dossier local | `~/<équipe>` |
 
 Contrat partagé : metatest l'écrit (`nom_equipe`/`nom_depot`), `nsi init` le
