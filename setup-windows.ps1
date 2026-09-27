@@ -262,6 +262,28 @@ function Show-Diagnostic {
         $distros = if ($noms.Count -eq 0) { "<aucune>" } else { $noms -join ", " }
     }
 
+    # De quoi trouver la notice du fabricant quand la virtualisation est
+    # coupee dans le BIOS : WSL 2 echoue alors sur HCS_E_HYPERV_NOT_INSTALLED,
+    # et l'option a activer (VT-x chez Intel, SVM chez AMD) se cherche d'apres
+    # le modele du PC, ou de la carte mere sur un PC fixe assemble.
+    $pc = $carte = $bios = $cpu = "<inconnu>"
+    try {
+        $cs = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+        $pc = "$($cs.Manufacturer) / $($cs.Model)"
+    } catch { }
+    try {
+        $bb = Get-CimInstance Win32_BaseBoard -ErrorAction Stop
+        $carte = "$($bb.Manufacturer) / $($bb.Product)"
+    } catch { }
+    try {
+        $bi = Get-CimInstance Win32_BIOS -ErrorAction Stop
+        $bios = "$($bi.Manufacturer) / $($bi.SMBIOSBIOSVersion) / $($bi.ReleaseDate)"
+    } catch { }
+    try {
+        $pr = @(Get-CimInstance Win32_Processor -ErrorAction Stop)[0]
+        $cpu = "$($pr.Name) / virtualisation firmware : $($pr.VirtualizationFirmwareEnabled)"
+    } catch { }
+
     Write-Host ""
     Write-Host "--- Etat detecte ---" -ForegroundColor Yellow
     Write-Host "  administrateur    : $admin"
@@ -273,6 +295,10 @@ function Show-Diagnostic {
     Write-Host "  winget            : $winget"
     Write-Host "  distributions     : $distros"
     Write-Host "  marqueur          : $(Test-Marqueur)"
+    Write-Host "  PC                : $pc"
+    Write-Host "  carte mere        : $carte"
+    Write-Host "  BIOS              : $bios"
+    Write-Host "  processeur        : $cpu"
     Write-Host "--------------------" -ForegroundColor Yellow
     Write-Host ""
 }
