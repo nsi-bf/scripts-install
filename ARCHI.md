@@ -50,8 +50,12 @@ Installé dans `~/.local/bin/nsi` (`INSTALL_PATH`). Ni son installation ni sa
 mise à jour n'exigent `sudo`.
 
 `sudo` n'est employé que pour les paquets système, sans alternative
-utilisateur raisonnable : `apt`/`dnf`, Erlang, `build-essential`, `gdb`,
-PostgreSQL, les dépôts `gh` et VS Code.
+utilisateur raisonnable : `apt`/`dnf`/`pacman`, Erlang, `build-essential`,
+`gdb`, PostgreSQL, les dépôts `gh` et VS Code.
+
+Distributions prises en charge : Debian et dérivées (`apt`), Fedora (`dnf`),
+Arch et dérivées comme Manjaro (`pacman`), macOS (`brew`). On ne vise pas
+toutes les distributions : un élève qui en a choisi une autre sait chercher.
 
 ## Points d'entrée
 
@@ -65,11 +69,19 @@ PostgreSQL, les dépôts `gh` et VS Code.
 | Plateforme | Qui l'installe |
 |---|---|
 | WSL | `setup-windows.ps1`, côté Windows |
-| Linux / macOS natif | `nsi`, via `install_vscode` |
+| Arch et dérivées | **l'élève lui-même**, avant |
+| autre Linux / macOS natif | `nsi`, via `install_vscode` |
 
 `install_vscode` commence par `is_wsl && return 0`. C'est le seul endroit qui
 porte cette décision : si VS Code devait un jour être installé sous WSL côté
 Linux, c'est cette ligne qu'il faudrait changer, pas les scripts.
+
+Sur Arch, `exiger_vscode_arch` ouvre `install_base` : si la commande `code`
+manque, `nsi` s'arrête et demande à l'élève d'installer VS Code lui-même, en
+l'orientant vers une recherche. VS Code et rien d'autre : VSCodium, qui fournit
+`codium` et non `code`, n'est pas accepté. On gère déjà plusieurs
+distributions, on ne gère pas en plus plusieurs éditeurs.
+Le test est fait en tête pour qu'il l'apprenne avant d'avoir attendu le reste.
 
 La contrepartie est que sous WSL, le `code` qu'appelle `nsi init` est celui de
 l'installation Windows, atteint par l'interop, et il n'ouvre le dossier Linux

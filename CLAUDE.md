@@ -268,7 +268,10 @@ Identique sur les trois plateformes, aucune condition de système à écrire.
 
 Script shell unique, auto-contenu.
 
-- Détecte l'OS (apt / dnf / brew) et WSL
+- Détecte l'OS (apt / dnf / pacman / brew) et WSL. `pacman` couvre Arch et
+  ses dérivées (Manjaro) : jamais de `-Sy` seul, le premier `pkg_install` fait
+  `-Syu`, et `pkg_remove` ne passe à `pacman -R` que les paquets installés,
+  car il échoue sur un paquet absent.
 - Idempotent : vérifie avant d'agir
 - Installé dans `~/.local/bin/nsi` (`INSTALL_PATH`). Ni son installation ni sa
   mise à jour n'exigent `sudo`. Se réinstalle tout seul s'il est lancé depuis
@@ -284,7 +287,7 @@ Script shell unique, auto-contenu.
 - `exiger_uv` précède chaque `uv sync` : « uv: command not found » ne dit pas
   quoi faire, « relance `nsi install base` » si.
 - `sudo` n'est employé que pour les paquets système sans alternative
-  utilisateur raisonnable : `apt`/`dnf`, Erlang, `build-essential`, `gdb`,
+  utilisateur raisonnable : `apt`/`dnf`/`pacman`, Erlang, `build-essential`, `gdb`,
   PostgreSQL, les dépôts `gh` et VSCode.
 - **Ne s'invoque jamais avec `sudo` en tête** (`nsi install base`, pas
   `sudo nsi install base`). Sur macOS il s'arrête et le dit : Homebrew refuse
@@ -297,10 +300,16 @@ Script shell unique, auto-contenu.
 | Plateforme | Qui l'installe |
 |---|---|
 | WSL | `setup-windows.ps1`, côté Windows |
-| Linux / macOS natif | `nsi`, via `install_vscode` |
+| Arch et dérivées | l'élève lui-même, avant |
+| autre Linux / macOS natif | `nsi`, via `install_vscode` |
 
 `install_vscode` commence par `is_wsl && return 0`. C'est le seul endroit qui
 porte cette décision.
+
+Sur Arch, `exiger_vscode_arch`, appelée en tête d'`install_base`, arrête `nsi`
+si `code` manque et renvoie l'élève vers Google ou une IA. On ne prend pas en
+charge toutes les distributions, ni plusieurs éditeurs : seule la commande
+`code` est acceptée, VSCodium (`codium`) ne l'est pas, et ne doit pas l'être.
 
 ## Composants
 
@@ -320,7 +329,11 @@ porte cette décision.
   (accessible à tous les utilisateurs), binaires symlinkés dans `/usr/local/bin`
 - `prolog`, SWI-Prolog (`swipl`)
 - `c`, GCC/G++/Make/GDB (`build-essential gdb` sur Debian, `gcc gcc-c++ make
-  gdb` sur Fedora, Xcode CLT + `gdb` sur macOS)
+  gdb` sur Fedora, `base-devel gdb` sur Arch, Xcode CLT + `gdb` sur macOS)
+
+Noms Arch (dépôts officiels, vérifiés le 2026-09-14) : `github-cli`, `gleam`
+(tire `erlang-core` et `erlang-eunit`), `jdk-openjdk`, `swi-prolog`,
+`postgresql` (non initialisé à l'installation : `initdb` puis `systemctl`).
 
 ## Interface
 

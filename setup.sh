@@ -47,6 +47,8 @@ if ! command -v curl &>/dev/null; then
         sudo apt-get update -qq && sudo apt-get install -y -qq curl
     elif command -v dnf &>/dev/null; then
         sudo dnf install -y -q curl
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -S --needed --noconfirm curl
     else
         echo "Erreur : curl est absent et je ne sais pas l'installer ici." >&2
         exit 1

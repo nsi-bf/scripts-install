@@ -40,6 +40,8 @@ is_mac() { [[ "$OSTYPE" == "darwin"* ]]; }
 has_apt() { command -v apt-get &>/dev/null; }
 has_dnf() { command -v dnf &>/dev/null; }
 has_brew() { command -v brew &>/dev/null; }
+# Arch et ses dérivées (Manjaro, EndeavourOS…).
+has_pacman() { command -v pacman &>/dev/null; }
 
 ensure_brew() {
     has_brew && return 0
@@ -78,6 +80,17 @@ pkg_install() {
             _pkg_upgraded=true
         fi
         sudo dnf install -y "$@"
+    elif has_pacman; then
+        # Jamais `-Sy` seul : une mise à jour partielle n'est pas prise en
+        # charge sur Arch, installer un paquet contre une base synchronisée
+        # sans mettre à jour le reste peut casser des bibliothèques. D'où
+        # `-Syu` au premier appel.
+        if [[ "$_pkg_upgraded" == false ]]; then
+            sudo pacman -Syu --needed --noconfirm "$@"
+            _pkg_upgraded=true
+        else
+            sudo pacman -S --needed --noconfirm "$@"
+        fi
     elif has_brew; then
         # Homebrew refuse d'être lancé en root : jamais de sudo ici.
         if [[ "$_pkg_upgraded" == false ]]; then
@@ -96,6 +109,16 @@ pkg_remove() {
         sudo env DEBIAN_FRONTEND=noninteractive apt-get remove -y "$@"
     elif has_dnf; then
         sudo dnf remove -y "$@"
+    elif has_pacman; then
+        # Contrairement à `apt-get remove`, pacman échoue sur un paquet absent
+        # (« target not found »), et `set -e` arrêterait tout `remove_base`.
+        local p installes=()
+        for p in "$@"; do
+            if pacman -Q "$p" &>/dev/null; then installes+=("$p"); fi
+        done
+        if (( ${#installes[@]} )); then
+            sudo pacman -Rns --noconfirm "${installes[@]}"
+        fi
     elif has_brew; then
         brew uninstall "$@"
     fi
@@ -163,6 +186,9 @@ install_gh() {
         sudo dnf install -y 'dnf-command(config-manager)'
         sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
         sudo dnf install -y gh
+    elif has_pacman; then
+        # Dans les dépôts officiels, sous le nom github-cli.
+        pkg_install github-cli
     elif has_brew; then
         brew install gh
     fi
@@ -176,6 +202,8 @@ remove_gh() {
     elif has_dnf; then
         sudo dnf remove -y gh
         sudo rm -f /etc/yum.repos.d/gh-cli.repo
+    elif has_pacman; then
+        pkg_remove github-cli
     elif has_brew; then
         brew uninstall gh
     fi
@@ -186,6 +214,7 @@ remove_gh() {
 install_vscode() {
     is_wsl && return 0
     command -v code &>/dev/null && return 0
+    exiger_vscode_arch
     if has_brew; then
         brew install --cask visual-studio-code
     elif has_apt; then
@@ -221,14 +250,40 @@ remove_vscode() {
     elif has_dnf; then
         sudo dnf remove -y code
         sudo rm -f /etc/yum.repos.d/vscode.repo
+    elif has_pacman; then
+        # Installé par l'élève, pas par nsi : on n'y touche pas.
+        return 0
     elif command -v snap &>/dev/null; then
         sudo snap remove code
     fi
 }
 
+# Sur Arch, VSCode n'est pas installé par nsi : l'élève le fait lui-même,
+# avant. VSCode et rien d'autre : on gère déjà plusieurs distributions, on ne
+# gère pas en plus plusieurs éditeurs. VSCodium, qui fournit `codium` et non
+# `code`, n'est donc pas accepté.
+# Appelé en tête de `install_base`, pour qu'il l'apprenne avant d'avoir
+# attendu tout le reste.
+exiger_vscode_arch() {
+    has_pacman || return 0
+    command -v code &>/dev/null && return 0
+    echo "" >&2
+    echo "VSCode n'est pas installé." >&2
+    echo "" >&2
+    echo "Sur ton système, c'est à toi de l'installer, avant de continuer." >&2
+    echo "VSCode, et pas VSCodium ni un autre éditeur." >&2
+    echo "Il faut qu'ensuite la commande  code  fonctionne dans un terminal." >&2
+    echo "Si tu ne sais pas comment faire, cherche « installer VSCode » suivi du" >&2
+    echo "nom de ton système (Manjaro, Arch…), sur Google ou auprès d'une IA." >&2
+    echo "" >&2
+    echo "Puis relance :  nsi install base" >&2
+    exit 1
+}
+
 # --- base ---
 
 install_base() {
+    exiger_vscode_arch
     install_wget
     install_git
     install_uv
@@ -251,6 +306,12 @@ remove_base() {
 install_gleam() {
     if has_brew; then
         brew list gleam &>/dev/null || brew install gleam
+        return 0
+    fi
+    if has_pacman; then
+        # Le paquet officiel tire erlang-core et erlang-eunit, soit l'équivalent
+        # de ce qu'on installe à la main sur Debian.
+        command -v gleam &>/dev/null || pkg_install gleam
         return 0
     fi
     if ! command -v erl &>/dev/null; then
@@ -295,6 +356,7 @@ install_gleam() {
 
 remove_gleam() {
     if has_brew; then brew uninstall gleam erlang; return; fi
+    if has_pacman; then pkg_remove gleam erlang-core erlang-eunit; return; fi
     rm -f "$HOME/.local/bin/gleam"
     # Ménage d'une éventuelle installation système (ancienne version du script).
     if [[ -e /usr/local/bin/gleam ]]; then
@@ -327,6 +389,14 @@ install_postgresql() {
         sudo systemctl enable --now postgresql || true
         sudo su -c "psql -c \"ALTER USER postgres PASSWORD 'postgres';\"" postgres || true
         sudo su -c "psql -c \"CREATE ROLE dev SUPERUSER LOGIN PASSWORD 'dev';\"" postgres 2>/dev/null || true
+    elif has_pacman; then
+        # Arch n'initialise pas la base à l'installation (ArchWiki, PostgreSQL).
+        pkg_install postgresql
+        sudo test -f /var/lib/postgres/data/PG_VERSION \
+            || sudo -u postgres initdb --locale=C.UTF-8 --encoding=UTF8 -D /var/lib/postgres/data
+        sudo systemctl enable --now postgresql || true
+        sudo su -c "psql -c \"ALTER USER postgres PASSWORD 'postgres';\"" postgres || true
+        sudo su -c "psql -c \"CREATE ROLE dev SUPERUSER LOGIN PASSWORD 'dev';\"" postgres 2>/dev/null || true
     elif has_brew; then
         brew install postgresql
         brew services start postgresql || true
@@ -340,6 +410,9 @@ remove_postgresql() {
     elif has_dnf; then
         sudo systemctl stop postgresql || true
         pkg_remove postgresql-server postgresql
+    elif has_pacman; then
+        sudo systemctl disable --now postgresql || true
+        pkg_remove postgresql
     elif has_brew; then
         brew services stop postgresql || true
         brew uninstall postgresql
@@ -354,6 +427,8 @@ install_openjdk() {
         pkg_install default-jdk
     elif has_dnf; then
         pkg_install java-latest-openjdk-devel
+    elif has_pacman; then
+        pkg_install jdk-openjdk
     elif has_brew; then
         brew install openjdk
         brew link --force --overwrite openjdk
@@ -365,6 +440,8 @@ remove_openjdk() {
         pkg_remove default-jdk
     elif has_dnf; then
         pkg_remove java-latest-openjdk-devel
+    elif has_pacman; then
+        pkg_remove jdk-openjdk
     elif has_brew; then
         brew uninstall openjdk
     fi
@@ -411,6 +488,8 @@ install_c() {
         pkg_install build-essential gdb
     elif has_dnf; then
         pkg_install gcc gcc-c++ make gdb
+    elif has_pacman; then
+        pkg_install base-devel gdb
     elif has_brew; then
         xcode-select --install 2>/dev/null || true
         brew list gdb &>/dev/null || brew install gdb
@@ -422,6 +501,10 @@ remove_c() {
         pkg_remove build-essential gdb
     elif has_dnf; then
         pkg_remove gcc gcc-c++ make gdb
+    elif has_pacman; then
+        # base-devel tire sudo et gcc, dont d'autres paquets dépendent : on ne
+        # retire que gdb.
+        pkg_remove gdb
     elif has_brew; then
         brew uninstall gdb 2>/dev/null || true
         echo "Sur macOS, gcc est fourni par Xcode Command Line Tools (non désinstallable via nsi)." >&2
@@ -436,6 +519,8 @@ install_prolog() {
         pkg_install swi-prolog
     elif has_dnf; then
         pkg_install pl
+    elif has_pacman; then
+        pkg_install swi-prolog
     elif has_brew; then
         brew install swi-prolog
     fi
@@ -446,6 +531,8 @@ remove_prolog() {
         pkg_remove swi-prolog
     elif has_dnf; then
         pkg_remove pl
+    elif has_pacman; then
+        pkg_remove swi-prolog
     elif has_brew; then
         brew uninstall swi-prolog
     fi
@@ -954,7 +1041,7 @@ fi
 # Sur macOS, Homebrew refuse d'être lancé en root (ensure_brew et tous les
 # "brew install" plus haut échoueraient) : nsi ne doit donc jamais être
 # invoqué avec sudo là-bas. Chaque commande élève elle-même les privilèges
-# dont elle a besoin (apt/dnf), rien de plus n'est requis ailleurs non plus.
+# dont elle a besoin (apt/dnf/pacman), rien de plus n'est requis ailleurs non plus.
 if is_mac && [[ "$(id -u)" -eq 0 ]]; then
     echo "Ne lance pas nsi avec sudo sur macOS : Homebrew le refuse." >&2
     echo "Lance simplement : nsi $*" >&2
