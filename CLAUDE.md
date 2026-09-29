@@ -572,8 +572,25 @@ l'ancien, et `git reset` **mixte** : les fichiers de l'élève ne bougent pas.
 - Un `*.lock` de plus d'une minute dans `.git/` est retiré avant tout : un git
   tué en route bloque les commits sans rien abîmer.
 
+**`nsi pull` et `nsi push` réparent d'eux-mêmes.** La panne se découvre le plus
+souvent au `nsi pull` de début de séance, et un élève ne doit pas avoir à
+connaître `nsi doctor` pour s'en sortir. `avec_reparation` lance la commande ;
+si elle échoue **et** qu'un verrou a été retiré ou que `git fsck` échoue, il
+répare et réessaie une fois. Un échec d'autre nature (réseau, conflit, droits)
+est rendu tel quel, sans rien toucher.
+
+Pour la même raison, `nsi push` ne fait plus `git commit || true` : ce `|| true`
+couvrait « rien à commiter », mais aussi un commit refusé par un dépôt abîmé,
+après quoi `git push` répondait « Everything up-to-date » et l'élève croyait
+son travail envoyé. Le commit n'est tenté que si l'index diffère de `HEAD`, et
+son échec compte.
+
 Testé le 2026-09-29 sur un dépôt dont tous les objets et la branche avaient
-été vidés, avec un commit poussé d'ailleurs entre-temps.
+été vidés, avec un commit poussé d'ailleurs entre-temps : par `nsi doctor`,
+`nsi pull` et `nsi push`, plus un verrou seul et un dépôt distant injoignable
+(aucune réparation tentée). Le faux GitHub doit être servi en `file://` : un
+clone par chemin local partage les objets par liens physiques, et vider ceux de
+l'élève vidait aussi ceux du « distant ».
 
 **Extension Python** (`ms-python.python`, qui tire Pylance et debugpy). Sous
 WSL, ce n'est pas le `code` de Windows qui compte : VSCode ouvre le dossier par

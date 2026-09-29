@@ -106,7 +106,7 @@ GitHub remplace la clé USB. Tes fichiers y sont stockés en ligne, accessibles 
 | `nsi pull` | Récupère la dernière version depuis GitHub |
 | `nsi reset-config` | Remet la configuration du projet à la version du prof (efface tes `uv add`) |
 | `nsi toggle-config` | Cache ou réaffiche dans VSCode les fichiers listés par `files.exclude` |
-| `nsi doctor` | Répare ton dépôt git s'il est abîmé (commit impossible) et installe l'extension Python si elle manque |
+| `nsi doctor` | Répare ton dépôt git s'il est abîmé (commit impossible) et installe l'extension Python si elle manque. `nsi pull` et `nsi push` réparent aussi le dépôt d'eux-mêmes |
 | `nsi dir` | Affiche le chemin de ton dossier de cours |
 | `nsi update` | Met à jour l'outil `nsi` |
 | `nsi install <composant>` | Installe un composant supplémentaire |

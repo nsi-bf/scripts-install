@@ -815,16 +815,26 @@ cmd_dir() {
     printf '%s\n' "$d"
 }
 
+# Le commit n'est tenté que s'il y a quelque chose à enregistrer, et son échec
+# compte. L'ancien `git commit || true` couvrait le cas « rien à commiter »,
+# mais aussi un commit refusé par un dépôt abîmé : le push suivant répondait
+# « Everything up-to-date » et l'élève croyait son travail envoyé.
+sauvegarder() {
+    git add -A || return 1
+    if ! git diff --cached --quiet; then
+        git commit -m "Sauvegarde du $(date '+%Y-%m-%d %H:%M')" || return 1
+    fi
+    git push
+}
+
 cmd_push() {
     aller_dans_le_depot
-    git add -A
-    git commit -m "Sauvegarde du $(date '+%Y-%m-%d %H:%M')" || true
-    git push
+    avec_reparation sauvegarder
 }
 
 cmd_pull() {
     aller_dans_le_depot
-    git pull
+    avec_reparation git pull
 }
 
 # --- doctor ---
@@ -867,19 +877,6 @@ commits_connus() {
 reparer_git() {
     local d="$1" tmp sauvegarde url c base=""
 
-    # Un verrou laissé par un git tué en route bloque tout commit (« Another
-    # git process seems to be running »), sans que rien ne soit abîmé. Plus
-    # d'une minute : aucun git ne le tient plus, sur un dépôt de cette taille.
-    find "$d/.git" -name '*.lock' -type f -mmin +1 \
-        -not -path "$d/.git/objects/*" -print -delete \
-        | sed 's|^|  verrou oublié retiré : |'
-
-    if git -C "$d" fsck --full --no-progress &>/dev/null \
-        && git -C "$d" status --porcelain &>/dev/null; then
-        echo "  Git : en bon état."
-        return 0
-    fi
-
     echo "  Git : dépôt abîmé, réparation depuis GitHub..."
     if ! url="$(git -C "$d" config --get remote.origin.url)"; then
         echo "  Erreur : je ne trouve pas l'adresse du dépôt sur GitHub." >&2
@@ -919,6 +916,50 @@ reparer_git() {
         echo "  travaillé sur un autre ordinateur depuis, montre ce message à" >&2
         echo "  ton prof avant de lancer nsi push." >&2
     fi
+}
+
+# Un verrou laissé par un git tué en route bloque tout commit (« Another git
+# process seems to be running »), sans que rien ne soit abîmé. Plus d'une
+# minute : aucun git ne le tient plus, sur un dépôt de cette taille. Rend 0 si
+# un verrou a été retiré.
+retirer_verrous() {
+    local retires
+    retires="$(find "$1/.git" -name '*.lock' -type f -mmin +1 \
+        -not -path "$1/.git/objects/*" -print -delete)"
+    [[ -n "$retires" ]] || return 1
+    sed 's|^|  verrou oublié retiré : |' <<< "$retires"
+}
+
+git_sain() {
+    git -C "$1" fsck --full --no-progress &>/dev/null \
+        && git -C "$1" status --porcelain &>/dev/null
+}
+
+verifier_git() {
+    retirer_verrous "$1" || true
+    if git_sain "$1"; then
+        echo "  Git : en bon état."
+    else
+        reparer_git "$1"
+    fi
+}
+
+# Lance "$@" dans le dépôt courant ; en cas d'échec dû à un verrou oublié ou à
+# un dépôt abîmé, répare et réessaie une fois. La panne se découvre souvent au
+# `nsi pull` de début de séance : l'élève ne doit pas avoir à connaître
+# `nsi doctor` pour s'en sortir. Un échec d'une autre nature (réseau, conflit)
+# est rendu tel quel, avec le message de git.
+avec_reparation() {
+    "$@" && return 0
+    local repare=1
+    retirer_verrous "$PWD" && repare=0
+    if ! git_sain "$PWD"; then
+        reparer_git "$PWD" || return 1
+        repare=0
+    fi
+    (( repare == 0 )) || return 1
+    echo "  On réessaie..."
+    "$@"
 }
 
 EXTENSION_PYTHON="ms-python.python"
@@ -980,7 +1021,7 @@ cmd_doctor() {
         exit 1
     fi
     echo "Vérification de ton installation"
-    reparer_git "$d" || ok=1
+    verifier_git "$d" || ok=1
     verifier_extension_python || ok=1
     return "$ok"
 }
