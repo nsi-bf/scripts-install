@@ -347,6 +347,7 @@ nsi pull          # pull
 nsi dir           # imprime le dossier de cours, pour `code "$(nsi dir)"`
 nsi reset-config  # remet la configuration du projet à celle du modèle
 nsi toggle-config # bascule l'affichage des fichiers listés par files.exclude
+nsi doctor        # répare le dépôt git abîmé, pose l'extension Python
 ```
 
 ## Structure du repo
@@ -546,6 +547,41 @@ en 404 et, sous `set -euo pipefail`, tuait la commande.
 le fichier s'écrit par redirection. Cette commande n'avait donc jamais pu
 fonctionner, comme la recherche d'équipe avant elle avec son `--arg`. Les deux
 fois, `gh api` s'est vu prêter des options qu'il n'a pas.
+
+### `nsi doctor`
+
+Deux pannes rencontrées par les élèves, une commande, idempotente : sur une
+installation saine elle ne touche à rien.
+
+**Dépôt git abîmé.** Une fermeture brutale de WSL (vu au lycée) laisse des
+objets de `.git/` vides (« object file … is empty »), une branche vidée ou un
+index illisible : plus aucun commit ne passe. Le diagnostic est
+`git fsck --full` puis `git status`. S'il échoue, on ne rafistole pas objet par
+objet : on clone un `.git` neuf depuis `origin`, on le met à la place de
+l'ancien, et `git reset` **mixte** : les fichiers de l'élève ne bougent pas.
+
+- L'ancien `.git` est déplacé dans `~/.local/state/nsi/git-abime-<date>`,
+  jamais effacé, et hors du dossier de cours : `nsi push` fait `git add -A`.
+- La branche est replacée sur le **dernier commit que l'élève avait** et que
+  GitHub connaît (`commits_connus` : branche, journal, puis `origin/<branche>`,
+  lus dans les fichiers, pas par git), pas sur la tête de GitHub. Sinon, s'il a
+  poussé depuis un autre poste, ses fichiers plus anciens passeraient pour des
+  modifications défaisant ce travail, et `nsi push` les enverrait. Replacé là
+  où il était, `nsi pull` rattrape normalement.
+- Seul l'historique des commits jamais poussés est perdu, pas leur contenu.
+- Un `*.lock` de plus d'une minute dans `.git/` est retiré avant tout : un git
+  tué en route bloque les commits sans rien abîmer.
+
+Testé le 2026-09-29 sur un dépôt dont tous les objets et la branche avaient
+été vidés, avec un commit poussé d'ailleurs entre-temps.
+
+**Extension Python** (`ms-python.python`, qui tire Pylance et debugpy). Sous
+WSL, ce n'est pas le `code` de Windows qui compte : VSCode ouvre le dossier par
+Remote-WSL, et les extensions utiles sont celles du serveur dans la
+distribution. On appelle donc `~/.vscode-server/bin/*/bin/code-server` (ou
+`cli/servers/*/server/bin/code-server`), qui liste et installe sans fenêtre
+ouverte. Ce serveur n'existe qu'après une première ouverture de VSCode sur un
+dossier WSL : sinon, `nsi doctor` le dit. Ailleurs, `code` suffit.
 
 ### `nsi push` / `nsi pull`
 

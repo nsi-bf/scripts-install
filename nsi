@@ -827,6 +827,164 @@ cmd_pull() {
     git pull
 }
 
+# --- doctor ---
+
+# Le premier commit connu du dépôt abîmé $1 (un dossier .git), lu dans les
+# fichiers et jamais par git : ses objets sont peut-être justement ce qui
+# manque. Candidats dans l'ordre : la branche courante, son dernier état dans
+# le journal (qui survit quand le fichier de la branche est vidé), puis le
+# dernier état connu du dépôt distant. Plusieurs lignes, la première valant
+# mieux.
+commits_connus() {
+    local g="$1" ref=""
+    ref="$(sed -n 's/^ref: //p' "$g/HEAD" 2>/dev/null)" || true
+    [[ -n "$ref" ]] || ref="refs/heads/main"
+    local branche="${ref#refs/heads/}"
+    {
+        cat "$g/$ref" 2>/dev/null
+        awk -v r="$ref" '$2 == r { print $1 }' "$g/packed-refs" 2>/dev/null
+        tail -n1 "$g/logs/$ref" 2>/dev/null | cut -d' ' -f2
+        cat "$g/refs/remotes/origin/$branche" 2>/dev/null
+        awk -v r="refs/remotes/origin/$branche" '$2 == r { print $1 }' "$g/packed-refs" 2>/dev/null
+        tail -n1 "$g/logs/refs/remotes/origin/$branche" 2>/dev/null | cut -d' ' -f2
+    } | grep -E '^[0-9a-f]{40}$' || true
+}
+
+# Répare le dépôt git de l'élève, abîmé par une fermeture brutale de WSL :
+# des objets de .git/ réduits à zéro octet (« object file ... is empty »),
+# une branche vidée, un index illisible. Plus aucun commit ne passe.
+#
+# On ne rafistole pas objet par objet : on reprend un .git neuf sur GitHub, et
+# on garde les fichiers de l'élève tels qu'ils sont. Seul l'historique des
+# sauvegardes jamais envoyées est perdu, pas leur contenu, qui est dans les
+# fichiers. L'ancien .git est déplacé, jamais effacé.
+#
+# La branche est replacée sur le dernier commit que l'élève avait, pas sur
+# celui de GitHub : s'il a poussé depuis un autre poste, ses fichiers d'ici
+# sont plus anciens, et comparés à GitHub ils passeraient pour des
+# modifications qui défont ce travail. `nsi push` les enverrait. Replacée là
+# où il était, `nsi pull` fait le rattrapage comme d'habitude.
+reparer_git() {
+    local d="$1" tmp sauvegarde url c base=""
+
+    # Un verrou laissé par un git tué en route bloque tout commit (« Another
+    # git process seems to be running »), sans que rien ne soit abîmé. Plus
+    # d'une minute : aucun git ne le tient plus, sur un dépôt de cette taille.
+    find "$d/.git" -name '*.lock' -type f -mmin +1 \
+        -not -path "$d/.git/objects/*" -print -delete \
+        | sed 's|^|  verrou oublié retiré : |'
+
+    if git -C "$d" fsck --full --no-progress &>/dev/null \
+        && git -C "$d" status --porcelain &>/dev/null; then
+        echo "  Git : en bon état."
+        return 0
+    fi
+
+    echo "  Git : dépôt abîmé, réparation depuis GitHub..."
+    if ! url="$(git -C "$d" config --get remote.origin.url)"; then
+        echo "  Erreur : je ne trouve pas l'adresse du dépôt sur GitHub." >&2
+        echo "  Montre ce message à ton prof." >&2
+        return 1
+    fi
+
+    tmp="$(mktemp -d "$d.reparation.XXXXXX")"
+    if ! git clone -q --no-checkout "$url" "$tmp"; then
+        rm -rf "$tmp"
+        echo "  Erreur : impossible de récupérer le dépôt sur GitHub." >&2
+        echo "  Vérifie ta connexion Internet, puis relance : nsi doctor" >&2
+        return 1
+    fi
+
+    # Hors du dossier de cours : un `nsi push` (git add -A) l'enverrait sinon.
+    sauvegarde="$HOME/.local/state/nsi/git-abime-$(date '+%Y-%m-%d_%H-%M-%S')"
+    mkdir -p "$(dirname "$sauvegarde")"
+    mv "$d/.git" "$sauvegarde"
+    mv "$tmp/.git" "$d/.git"
+    rmdir "$tmp"
+
+    while read -r c; do
+        if git -C "$d" cat-file -e "$c^{commit}" 2>/dev/null; then
+            base="$c"
+            break
+        fi
+    done < <(commits_connus "$sauvegarde")
+
+    # Mixte, pas --hard : l'index suit le commit, les fichiers ne bougent pas.
+    git -C "$d" reset -q ${base:+"$base"}
+
+    echo "  Git : réparé. Tes fichiers n'ont pas été touchés."
+    echo "  (l'ancien dossier .git est conservé dans $sauvegarde)"
+    if [[ -z "$base" ]]; then
+        echo "  Attention : je n'ai pas retrouvé où tu en étais. Si tu as" >&2
+        echo "  travaillé sur un autre ordinateur depuis, montre ce message à" >&2
+        echo "  ton prof avant de lancer nsi push." >&2
+    fi
+}
+
+EXTENSION_PYTHON="ms-python.python"
+
+# Le `code` qui gère les extensions là où VSCode exécute le code de l'élève.
+# Sous WSL ce n'est pas celui de Windows : VSCode y ouvre le dossier par
+# Remote-WSL, et les extensions qui comptent sont celles du serveur installé
+# dans la distribution, sous ~/.vscode-server. Une extension Python posée côté
+# Windows n'y sert à rien. Le serveur apparaît à la première ouverture de
+# VSCode sur un dossier WSL ; on prend le plus récent.
+code_extensions() {
+    if is_wsl; then
+        ls -td "$HOME"/.vscode-server/bin/*/bin/code-server \
+               "$HOME"/.vscode-server/cli/servers/*/server/bin/code-server \
+               2>/dev/null | head -n1
+    else
+        command -v code || true
+    fi
+}
+
+verifier_extension_python() {
+    local code
+    code="$(code_extensions)"
+    if [[ -z "$code" ]]; then
+        if is_wsl; then
+            echo "  VSCode n'a encore jamais été ouvert sur ta Debian."
+            echo "  Lance : code \"\$(nsi dir)\" puis, une fois VSCode ouvert, nsi doctor"
+        else
+            echo "  Erreur : la commande 'code' est introuvable." >&2
+        fi
+        return 1
+    fi
+
+    if "$code" --list-extensions 2>/dev/null | grep -qixF "$EXTENSION_PYTHON"; then
+        echo "  Extension Python : installée."
+        return 0
+    fi
+    echo "  Extension Python : absente, installation..."
+    # NODE_NO_WARNINGS : le serveur VSCode affiche sinon un avertissement de
+    # Node (DEP0169) qui ne concerne pas l'élève.
+    if NODE_NO_WARNINGS=1 "$code" --install-extension "$EXTENSION_PYTHON" >/dev/null; then
+        echo "  Extension Python : installée. Ferme et rouvre VSCode."
+    else
+        echo "  Erreur : l'installation de l'extension Python a échoué." >&2
+        return 1
+    fi
+}
+
+cmd_doctor() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        echo "Erreur : 'nsi doctor' ne doit pas être lancé avec sudo." >&2
+        echo "Lance simplement : nsi doctor" >&2
+        exit 1
+    fi
+    local d ok=0
+    if ! d="$(dossier_eleve)"; then
+        echo "Je ne sais pas où est ton dépôt de cours." >&2
+        echo "Lance d'abord : nsi init" >&2
+        exit 1
+    fi
+    echo "Vérification de ton installation"
+    reparer_git "$d" || ok=1
+    verifier_extension_python || ok=1
+    return "$ok"
+}
+
 # --- git ---
 
 cmd_init() {
@@ -1099,6 +1257,9 @@ case "$cmd" in
     toggle-config)
         cmd_toggle_config
         ;;
+    doctor)
+        cmd_doctor
+        ;;
     *)
         echo "Usage: nsi install|remove base|gleam|postgresql|openjdk|nasm|rust|prolog|c" >&2
         echo "       nsi update" >&2
@@ -1107,6 +1268,7 @@ case "$cmd" in
         echo "       nsi dir" >&2
         echo "       nsi reset-config" >&2
         echo "       nsi toggle-config" >&2
+        echo "       nsi doctor" >&2
         exit 1
         ;;
 esac
