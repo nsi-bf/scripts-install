@@ -343,7 +343,7 @@ nsi remove <composant>
 nsi update
 nsi init          # première mise en route : GitHub, dépôt, VSCode
 nsi push          # commit horodaté + push
-nsi pull          # pull
+nsi pull          # pull + uv sync
 nsi dir           # imprime le dossier de cours, pour `code "$(nsi dir)"`
 nsi reset-config  # remet la configuration du projet à celle du modèle
 nsi toggle-config # bascule l'affichage des fichiers listés par files.exclude
@@ -603,4 +603,6 @@ dossier WSL : sinon, `nsi doctor` le dit. Ailleurs, `code` suffit.
 ### `nsi push` / `nsi pull`
 
 `git add -A && git commit -m "Sauvegarde du <date>" && git push`, sans erreur
-si rien n'a changé. Et `git pull`.
+si rien n'a changé. Et `git pull` suivi de `uv sync` : un `uv add` fait sur un
+autre poste arrive par `pyproject.toml`, et sans ce sync l'import échouerait
+sur ModuleNotFoundError.

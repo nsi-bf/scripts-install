@@ -103,7 +103,7 @@ GitHub remplace la clé USB. Tes fichiers y sont stockés en ligne, accessibles 
 |---|---|
 | `nsi init` | Première mise en route : GitHub, ton dépôt, VSCode |
 | `nsi push` | Sauvegarde et envoie ton travail sur GitHub |
-| `nsi pull` | Récupère la dernière version depuis GitHub |
+| `nsi pull` | Récupère la dernière version depuis GitHub et installe les paquets Python qu'elle demande |
 | `nsi reset-config` | Remet la configuration du projet à la version du prof (efface tes `uv add`) |
 | `nsi toggle-config` | Cache ou réaffiche dans VSCode les fichiers listés par `files.exclude` |
 | `nsi doctor` | Répare ton dépôt git s'il est abîmé (commit impossible) et installe l'extension Python si elle manque. `nsi pull` et `nsi push` réparent aussi le dépôt d'eux-mêmes |

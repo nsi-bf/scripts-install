@@ -835,6 +835,10 @@ cmd_push() {
 cmd_pull() {
     aller_dans_le_depot
     avec_reparation git pull
+    # Le pyproject.toml a pu changer, par un `uv add` fait sur un autre poste :
+    # sans ce sync, l'import échouerait ici sur ModuleNotFoundError.
+    exiger_uv
+    uv sync
 }
 
 # --- doctor ---
