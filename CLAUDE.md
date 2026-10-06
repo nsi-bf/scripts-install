@@ -319,6 +319,10 @@ charge toutes les distributions, ni plusieurs éditeurs : seule la commande
 - graphviz
 - gh-cli
 - vscode (ignoré sous WSL)
+- bibliothèques graphiques pour Qt (`libgl1`, `libxcb-*`, `libwayland-*`…),
+  **Debian sous WSL seulement** : l'image WSL est minimale, et une fenêtre Qt
+  n'y s'affiche pas sans elles. Jamais retirées par `remove base`, d'autres
+  paquets en dépendent.
 
 ### autres composants (installables individuellement)
 - `gleam`, Gleam + Erlang

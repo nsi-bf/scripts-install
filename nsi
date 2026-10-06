@@ -282,6 +282,24 @@ exiger_vscode_arch() {
 
 # --- base ---
 
+# Bibliothèques dont une fenêtre Qt a besoin pour s'afficher sous WSL (par
+# WSLg) : une Debian WSL est une image minimale, sans rien de graphique.
+# Debian sous WSL seulement : un Linux de bureau ou macOS les a déjà.
+# Pas de `--needed`, option de pacman qu'apt refuse : `apt-get install` ne
+# réinstalle de toute façon rien de ce qui est présent.
+LIBS_GRAPHIQUES_WSL=(libgl1 libegl1 libxkbcommon0 libxkbcommon-x11-0
+    libfontconfig1 libdbus-1-3 libxcb-cursor0 libxcb-icccm4 libxcb-image0
+    libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0
+    libxcb-xinerama0 libxcb-xkb1 libxcb-xfixes0 libwayland-client0
+    libwayland-cursor0 libwayland-egl1)
+
+install_libs_graphiques_wsl() {
+    is_wsl && has_apt || return 0
+    pkg_install "${LIBS_GRAPHIQUES_WSL[@]}"
+}
+# Pas de remove_libs_graphiques_wsl : libdbus, libfontconfig, libgl1 servent
+# à bien d'autres paquets, les retirer pourrait en emporter.
+
 install_base() {
     exiger_vscode_arch
     install_wget
@@ -290,6 +308,7 @@ install_base() {
     install_graphviz
     install_gh
     install_vscode
+    install_libs_graphiques_wsl
 }
 
 remove_base() {
