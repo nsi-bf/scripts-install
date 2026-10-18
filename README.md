@@ -61,7 +61,7 @@ Il te sera demandé un **token d'accès personnel** (une sorte de mot de passe s
 
 Pour créer ton token : va sur [https://github.com/settings/tokens](https://github.com/settings/tokens), clique sur **Generate new token (classic)**, et coche les trois portées **`repo`**, **`read:org`** et **`gist`**.
 
-> **Attention : le token ne s'affiche qu'une seule fois, copie-le immédiatement.** Garde-le en lieu sûr : `nsi init` le redemande à chaque fois. Si tu l'as perdu, révoque-le et crée-en un nouveau.
+> **Attention : le token ne s'affiche qu'une seule fois, copie-le immédiatement.** Garde-le en lieu sûr : `nsi init` le redemande à chaque fois. Si tu l'as perdu, ou s'il a expiré, révoque-le, crée-en un nouveau, et donne-le à `nsi token`.
 
 Une fois terminé, **VSCode s'ouvre automatiquement** dans ton dépôt. C'est là que tu travailleras.
 
@@ -102,6 +102,7 @@ GitHub remplace la clé USB. Tes fichiers y sont stockés en ligne, accessibles 
 | Commande | Description |
 |---|---|
 | `nsi init` | Première mise en route : GitHub, ton dépôt, VSCode |
+| `nsi token` | Redemande ton token GitHub, quand l'ancien a expiré ou est perdu |
 | `nsi push` | Sauvegarde et envoie ton travail sur GitHub |
 | `nsi pull` | Récupère la dernière version depuis GitHub et installe les paquets Python qu'elle demande |
 | `nsi reset-config` | Remet la configuration du projet à la version du prof (efface tes `uv add`) |

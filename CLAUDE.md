@@ -352,6 +352,7 @@ nsi install <composant>
 nsi remove <composant>
 nsi update
 nsi init          # première mise en route : GitHub, dépôt, VSCode
+nsi token         # redemande le jeton et refait l'authentification, rien d'autre
 nsi push          # commit horodaté + push
 nsi pull          # pull + uv sync
 nsi dir           # imprime le dossier de cours, pour `code "$(nsi dir)"`

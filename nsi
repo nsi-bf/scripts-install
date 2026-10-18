@@ -1110,17 +1110,9 @@ cmd_doctor() {
 
 # --- git ---
 
-cmd_init() {
-    if [[ "$(id -u)" -eq 0 ]]; then
-        echo "Erreur : 'nsi init' ne doit pas être lancé avec sudo." >&2
-        echo "Lance simplement : nsi init" >&2
-        exit 1
-    fi
-    echo ""
-    echo "Configuration de Git et GitHub"
-    echo "=============================="
-    echo ""
-
+# Demande un jeton jusqu'à ce que gh l'accepte, puis relie git à gh.
+# Partagé par `nsi init` et `nsi token` ; $1 est la commande à relancer.
+demander_jeton() {
     # On boucle jusqu'à ce que gh accepte le jeton. Un débutant se trompe de
     # portée, colle un jeton tronqué ou expiré : lui rendre la main plutôt que
     # de le laisser devant un script mort.
@@ -1142,7 +1134,7 @@ cmd_init() {
         if ! read -rp "Token GitHub : " github_token; then
             echo "" >&2
             echo "Erreur : impossible de lire ta réponse (pas de terminal)." >&2
-            echo "Ouvre un terminal et lance : nsi init" >&2
+            echo "Ouvre un terminal et lance : nsi $1" >&2
             exit 1
         fi
 
@@ -1171,6 +1163,34 @@ cmd_init() {
     # pas `git`. Sans cet enregistrement de `gh` comme credential helper,
     # `nsi push` et `nsi pull` ne seraient pas authentifiés.
     gh auth setup-git
+}
+
+# Seulement le jeton : pour un jeton expiré, révoqué ou perdu, sans refaire
+# la recherche du dépôt ni le `uv sync` de `nsi init`.
+cmd_token() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        echo "Erreur : 'nsi token' ne doit pas être lancé avec sudo." >&2
+        echo "Lance simplement : nsi token" >&2
+        exit 1
+    fi
+    echo ""
+    demander_jeton token
+    echo ""
+    echo "Connecté à GitHub en tant que $(gh api user --jq .login)."
+}
+
+cmd_init() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        echo "Erreur : 'nsi init' ne doit pas être lancé avec sudo." >&2
+        echo "Lance simplement : nsi init" >&2
+        exit 1
+    fi
+    echo ""
+    echo "Configuration de Git et GitHub"
+    echo "=============================="
+    echo ""
+
+    demander_jeton init
 
     local pseudo
     pseudo="$(gh api user --jq .login)"
@@ -1365,6 +1385,9 @@ case "$cmd" in
     init)
         cmd_init
         ;;
+    token)
+        cmd_token
+        ;;
     dir)
         cmd_dir
         ;;
@@ -1387,6 +1410,7 @@ case "$cmd" in
         echo "Usage: nsi install|remove base|gleam|postgresql|openjdk|nasm|rust|prolog|c" >&2
         echo "       nsi update" >&2
         echo "       nsi init" >&2
+        echo "       nsi token" >&2
         echo "       nsi push | nsi pull" >&2
         echo "       nsi dir" >&2
         echo "       nsi reset-config" >&2
