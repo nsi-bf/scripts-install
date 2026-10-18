@@ -323,14 +323,23 @@ remove_base() {
 # --- gleam ---
 
 install_gleam() {
+    # Chaque `nsi install gleam` amène gleam à sa dernière version : il en sort
+    # souvent, et un cours écrit pour la récente peut ne pas compiler avec une
+    # ancienne. Seul gleam est concerné, pas Erlang, qui suit son dépôt.
     if has_brew; then
-        brew list gleam &>/dev/null || brew install gleam
+        if brew list gleam &>/dev/null; then
+            brew upgrade gleam
+        else
+            brew install gleam
+        fi
         return 0
     fi
     if has_pacman; then
         # Le paquet officiel tire erlang-core et erlang-eunit, soit l'équivalent
-        # de ce qu'on installe à la main sur Debian.
-        command -v gleam &>/dev/null || pkg_install gleam
+        # de ce qu'on installe à la main sur Debian. Le premier pkg_install fait
+        # `-Syu`, qui met gleam à jour s'il l'est déjà ; `--needed` évite de le
+        # réinstaller pour rien.
+        pkg_install gleam
         return 0
     fi
     if ! command -v erl &>/dev/null; then
@@ -348,10 +357,19 @@ install_gleam() {
             pkg_install erlang
         fi
     fi
-    if command -v gleam &>/dev/null; then return 0; fi
-    local version arch bindir
+    local version actuelle arch bindir tmp
     version=$(curl -fsSL https://api.github.com/repos/gleam-lang/gleam/releases/latest \
         | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/')
+    if [[ -z "$version" ]]; then
+        echo "Impossible de connaître la dernière version de gleam (réseau ?)." >&2
+        exit 1
+    fi
+    # `gleam --version` écrit « gleam 1.18.1 ».
+    actuelle="$(gleam --version 2>/dev/null | awk '{print $2}')" || true
+    if [[ "$actuelle" == "$version" ]]; then
+        echo "gleam $version est déjà la dernière version."
+        return 0
+    fi
     case "$(uname -m)" in
         x86_64)  arch="x86_64-unknown-linux-musl" ;;
         aarch64) arch="aarch64-unknown-linux-musl" ;;
@@ -363,14 +381,55 @@ install_gleam() {
     # utilisateur raisonnable, et il est partagé par tous les projets.)
     bindir="$HOME/.local/bin"
     mkdir -p "$bindir"
-    curl -fsSL "https://github.com/gleam-lang/gleam/releases/download/v${version}/gleam-v${version}-${arch}.tar.gz" \
-        | tar xz -C "$bindir" gleam
+    # Extrait à côté puis renommé : l'ancien binaire reste en place tant que
+    # le nouveau n'est pas entier, un téléchargement coupé ne laisse pas
+    # l'élève sans gleam.
+    tmp="$(mktemp -d "$bindir/.gleam.XXXXXX")"
+    if ! curl -fsSL "https://github.com/gleam-lang/gleam/releases/download/v${version}/gleam-v${version}-${arch}.tar.gz" \
+        | tar xz -C "$tmp" gleam; then
+        rm -rf "${tmp:?}"
+        echo "Téléchargement de gleam $version échoué." >&2
+        exit 1
+    fi
+    mv "$tmp/gleam" "$bindir/gleam"
+    rmdir "$tmp"
     echo
-    echo "gleam $version installé dans $bindir"
+    if [[ -n "$actuelle" ]]; then
+        echo "gleam mis à jour : $actuelle -> $version, dans $bindir"
+    else
+        echo "gleam $version installé dans $bindir"
+    fi
     case ":$PATH:" in
         *":$bindir:"*) ;;
         *) echo "Ouvre un nouveau terminal pour que $bindir entre dans ton PATH." ;;
     esac
+}
+
+# Un projet gleam prêt à l'emploi dans le dépôt de l'élève, `prog_gleam/`.
+# Idempotent : gleam.toml présent, rien à faire. Jamais fatal : l'outil est
+# installé de toute façon, et le dépôt peut ne pas exister encore.
+#
+# --skip-git : ni .git ni .github, le dossier vit dans le dépôt de l'élève.
+# Cette option retire aussi le .gitignore de gleam, qui écarte build/ : on le
+# repose, sinon `nsi push` enverrait les fichiers compilés.
+creer_projet_gleam() {
+    local d
+    if ! d="$(dossier_eleve)"; then
+        echo "Projet gleam non créé : je ne sais pas encore où est ton dépôt de cours."
+        echo "Lance 'nsi init', puis de nouveau 'nsi install gleam'."
+        return 0
+    fi
+    if [[ -f "$d/prog_gleam/gleam.toml" ]]; then
+        return 0
+    fi
+    # `gleam new` accepte un dossier existant tant qu'aucun des fichiers qu'il
+    # pose n'y est déjà ; sinon il refuse sans rien écraser.
+    if ! (cd "$d" && gleam new --skip-git prog_gleam); then
+        echo "Le projet gleam n'a pas pu être créé dans $d/prog_gleam." >&2
+        return 0
+    fi
+    [[ -e "$d/prog_gleam/.gitignore" ]] ||
+        printf '%s\n' '*.beam' '*.ez' '/build' 'erl_crash.dump' > "$d/prog_gleam/.gitignore"
 }
 
 remove_gleam() {
@@ -1277,7 +1336,7 @@ case "$cmd" in
     install)
         case "$component" in
             base)       install_base ;;
-            gleam)      install_gleam ;;
+            gleam)      install_gleam; creer_projet_gleam ;;
             postgresql) install_postgresql ;;
             openjdk)    install_openjdk ;;
             nasm)       install_nasm ;;

@@ -325,7 +325,13 @@ charge toutes les distributions, ni plusieurs éditeurs : seule la commande
   paquets en dépendent.
 
 ### autres composants (installables individuellement)
-- `gleam`, Gleam + Erlang
+- `gleam`, Gleam + Erlang. Chaque `nsi install gleam` amène gleam à sa
+  dernière version (binaire remplacé seulement une fois le nouveau entier,
+  `brew upgrade`, `pacman -Syu`), sans désinstaller ni réinstaller Erlang,
+  qui suit son dépôt. Crée aussi le projet `prog_gleam/` dans le dépôt
+  de l'élève s'il n'a pas de `gleam.toml` (`gleam new --skip-git` : ni `.git`
+  ni `.github`, mais un `.gitignore` reposé à la main pour écarter `build/`).
+  Sans dépôt (`nsi init` pas fait), le signale et n'échoue pas.
 - `postgresql`, configuration développeur sans sécurité, superuser `dev`/`dev`
 - `openjdk`, JDK complet
 - `nasm`, assembleur x86
