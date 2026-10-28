@@ -646,6 +646,15 @@ Bascule `"chat.disableAIFeatures"` dans `.vscode/settings.json` du dépôt
   suggestions »). Remis d'office si l'élève les a changés.
 - Même méthode que `toggle-config` : le JSONC n'est pas parsé puis réécrit,
   seules les valeurs concernées changent, commentaires intacts.
+- **À l'activation, rappelle de connecter VSCode à GitHub**, une fois par poste.
+  Le jeton de `nsi init` n'authentifie que `gh`, et `git` par le credential
+  helper (`gh auth setup-git`). VSCode a sa propre application OAuth et sa
+  propre session, ne lit pas celle de `gh`, et aucun script ne peut la poser à
+  sa place : la doc VSCode décrit une connexion déclenchée par l'éditeur, et les
+  mainteneurs de `gh` disent ne pas pouvoir s'appuyer sur celle de VSCode
+  (cli/cli#1074). Sans ce clic, Copilot ne répond pas, quoi que dise
+  `settings.json`. Deux chemins donnés à l'élève : l'icône Copilot de la barre
+  d'état en bas à droite, ou l'icône Comptes en bas de la barre d'activité.
 - Rien n'est modifié si le téléchargement échoue : le `settings.json` est écrit
   à côté, puis mis en place une fois les consignes reçues.
 

@@ -846,9 +846,21 @@ EOF
     if [[ "$etat" == on ]]; then
         echo "IA activée dans VSCode : tu peux discuter avec Copilot."
         echo "Ses consignes sont dans $instructions."
+        # Le jeton de `nsi init` n'authentifie que `gh`, donc `git` par le
+        # credential helper. VSCode, lui, a sa propre application OAuth et sa
+        # propre session : il ne lit pas celle de `gh`, et aucun script ne peut
+        # la poser à sa place. L'élève doit cliquer une fois, par poste.
+        echo ""
+        echo "Si ce n'est pas déjà fait sur cet ordinateur, connecte VSCode à ton"
+        echo "compte GitHub : en bas à droite, clique sur l'icône Copilot, puis"
+        echo "« Se connecter ». Autre chemin : l'icône en forme de bonhomme"
+        echo "(Comptes), en bas de la barre de gauche."
+        echo "C'est à faire une seule fois par poste : le token de nsi init"
+        echo "authentifie git, pas VSCode."
     else
         echo "IA désactivée dans VSCode."
     fi
+    echo ""
     echo "Les suggestions automatiques dans le code restent désactivées."
     echo "Pour revenir en arrière : nsi ai"
 }

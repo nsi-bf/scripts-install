@@ -102,7 +102,7 @@ GitHub remplace la clé USB. Tes fichiers y sont stockés en ligne, accessibles 
 | Commande | Description |
 |---|---|
 | `nsi init` | Première mise en route : GitHub, ton dépôt, VSCode |
-| `nsi ai` | Active ou désactive l'IA (Copilot) dans VSCode. Elle ne t'écrit jamais de code toute seule |
+| `nsi ai` | Active ou désactive l'IA (Copilot) dans VSCode. Elle ne t'écrit jamais de code toute seule. La première fois sur un ordinateur, connecte VSCode à ton compte GitHub : icône Copilot en bas à droite, « Se connecter » (ou l'icône en forme de bonhomme en bas de la barre de gauche) |
 | `nsi token` | Redemande ton token GitHub, quand l'ancien a expiré ou est perdu |
 | `nsi push` | Sauvegarde et envoie ton travail sur GitHub |
 | `nsi pull` | Récupère la dernière version depuis GitHub et installe les paquets Python qu'elle demande |

@@ -102,6 +102,11 @@ Le modèle livre `"chat.disableAIFeatures": true` : un dépôt neuf arrive avec
 l'IA coupée. `nsi ai` la bascule, dans le `settings.json` du dépôt, et ce choix
 appartient à l'élève.
 
+Ce que `nsi ai` ne peut pas faire : connecter VS Code à GitHub. Le jeton de
+`nsi init` authentifie `gh`, et `git` à travers lui ; VS Code a sa propre
+session OAuth, qu'aucun script ne peut poser. C'est un clic de l'élève, une
+fois par poste, et `nsi ai` le lui rappelle à chaque activation.
+
 Les suggestions en ligne, elles, ne lui appartiennent pas : `nsi ai` les
 recoupe d'office **dans les deux sens** (`github.copilot.enable` à
 `{ "*": false }`, `github.copilot.nextEditSuggestions.enabled` à `false`),
