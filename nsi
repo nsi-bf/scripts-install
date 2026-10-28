@@ -8,7 +8,8 @@ GITHUB_RAW_URL="https://raw.githubusercontent.com/nsi-bf/scripts-install/main/ns
 # l'élève, jamais par curl qui n'en a pas.
 TEMPLATE_REPO="template-eleves"
 TEMPLATE_FICHIERS=(.vscode/settings.json .vscode/extensions.json
-                   pyproject.toml .gitignore)
+                   pyproject.toml .gitignore
+                   .github/copilot-instructions.md)
 # nsi vit chez l'utilisateur : ni son installation ni sa mise à jour
 # n'exigent sudo. ~/.local/bin passe avant /usr/local/bin dans le PATH.
 INSTALL_PATH="$HOME/.local/bin/nsi"
@@ -646,6 +647,212 @@ remove_rust() {
 
 # --- hide ---
 
+# Bascule l'IA de VSCode pour ce dépôt : "chat.disableAIFeatures".
+#
+# Quand l'IA s'active, Copilot reçoit ses consignes de tuteur dans
+# .github/copilot-instructions.md, l'emplacement que VSCode lit de lui-même,
+# repris du modèle au même chemin : un dépôt engendré avant qu'il y soit ne l'a
+# pas, et le modèle peut l'avoir amélioré depuis.
+# Dans les deux sens, les suggestions inline restent coupées : l'élève peut
+# discuter avec Copilot, pas le laisser écrire son code en fantôme.
+#
+# Comme pour toggle-config, le fichier est du JSONC : on ne réécrit que les
+# valeurs des réglages concernés, commentaires et mise en forme intacts.
+# Rien n'est modifié tant que tout n'est pas prêt : le settings.json est écrit
+# à côté, les instructions téléchargées, puis les deux mis en place.
+cmd_ai() {
+    aller_dans_le_depot
+    local settings=".vscode/settings.json" instructions=".github/copilot-instructions.md"
+    [[ -f "$settings" ]] || { echo "Fichier $settings introuvable. Lance nsi reset-config." >&2; exit 1; }
+
+    local tmp_settings tmp_instr etat
+    tmp_settings="$(mktemp "$settings.XXXXXX")"
+    # Un Ctrl-C entre le mktemp et le mv laisserait un
+    # .vscode/settings.json.XXXXXX dans le dépôt, que le `git add -A` de
+    # `nsi push` enverrait sur GitHub. Le trap le retire, y compris sur SIGINT
+    # (vérifié) ; après les mv ces chemins n'existent plus, le rm ne fait rien.
+    #
+    # Guillemets DOUBLES : le chemin est inscrit dans le trap maintenant, pas
+    # relu à la sortie. Le trap s'exécute une fois la fonction quittée, donc
+    # hors de portée de ses `local` : `$tmp_settings` y serait vide, et sous
+    # `set -u` nsi mourait sur « tmp_settings: unbound variable » après avoir
+    # pourtant tout fait correctement (constaté le 2026-10-28).
+    # shellcheck disable=SC2064  # expansion immédiate voulue, voir ci-dessus
+    trap "rm -f '$tmp_settings'" EXIT
+    if ! etat="$(python_uv "$settings" "$tmp_settings" <<'EOF'
+import json, sys
+
+source, sortie = sys.argv[1], sys.argv[2]
+t = open(source, encoding="utf-8").read()
+n = len(t)
+
+def erreur(msg):
+    print(source + " : " + msg, file=sys.stderr)
+    raise SystemExit(1)
+
+def blancs(i):
+    """Saute espaces et commentaires."""
+    while i < n:
+        if t[i] in " \t\r\n":
+            i += 1
+        elif t.startswith("//", i):
+            j = t.find("\n", i)
+            i = n if j == -1 else j
+        elif t.startswith("/*", i):
+            j = t.find("*/", i + 2)
+            i = n if j == -1 else j + 2
+        else:
+            break
+    return i
+
+def fin_chaine(i):
+    """t[i] est un guillemet ; rend la position qui suit la chaîne."""
+    j = i + 1
+    while j < n:
+        if t[j] == "\\":
+            j += 2
+        elif t[j] == '"':
+            return j + 1
+        else:
+            j += 1
+    erreur("chaîne non terminée")
+
+def fin_valeur(i):
+    if t[i] == '"':
+        return fin_chaine(i)
+    if t[i] in "{[":
+        profondeur = 0
+        while i < n:
+            i = blancs(i)
+            if i >= n:
+                break
+            c = t[i]
+            if c == '"':
+                i = fin_chaine(i)
+                continue
+            if c in "{[":
+                profondeur += 1
+            elif c in "}]":
+                profondeur -= 1
+                if profondeur == 0:
+                    return i + 1
+            i += 1
+        erreur("accolade non fermée")
+    j = i
+    while j < n and t[j] not in ",}] \t\r\n/":
+        j += 1
+    return j
+
+# Les réglages de premier niveau : clé -> (début, fin) de leur valeur.
+i = blancs(0)
+if i >= n or t[i] != "{":
+    erreur("ce n'est pas un objet JSON")
+ouverture = i
+reglages = {}
+debuts_cles = []
+i += 1
+while True:
+    i = blancs(i)
+    if i >= n:
+        erreur("accolade finale manquante")
+    if t[i] == "}":
+        break
+    if t[i] == ",":
+        i += 1
+        continue
+    if t[i] != '"':
+        erreur("clé attendue")
+    debuts_cles.append(i)
+    j = fin_chaine(i)
+    cle = json.loads(t[i:j])
+    i = blancs(j)
+    if i >= n or t[i] != ":":
+        erreur("':' attendu après " + cle)
+    debut = blancs(i + 1)
+    fin = fin_valeur(debut)
+    reglages[cle] = (debut, fin)
+    i = fin
+
+def valeur(cle):
+    a, b = reglages[cle]
+    try:
+        return json.loads(t[a:b])
+    except ValueError:
+        return None    # commentaires dans la valeur, etc. : on la remplace
+
+# "chat.disableAIFeatures" absent vaut false : l'IA est active.
+if "chat.disableAIFeatures" in reglages:
+    actuel = valeur("chat.disableAIFeatures")
+    if not isinstance(actuel, bool):
+        erreur('"chat.disableAIFeatures" ne vaut ni true ni false')
+else:
+    actuel = False
+desactive = not actuel
+
+voulu = {
+    "chat.disableAIFeatures": (desactive, "true" if desactive else "false"),
+    "github.copilot.enable": ({"*": False}, '{ "*": false }'),
+    "github.copilot.nextEditSuggestions.enabled": (False, "false"),
+}
+
+remplacements = []   # (début, fin, texte)
+ajouts = []
+for cle, (attendu, texte) in voulu.items():
+    if cle not in reglages:
+        ajouts.append(json.dumps(cle) + ": " + texte + ",")
+    elif valeur(cle) != attendu:
+        a, b = reglages[cle]
+        remplacements.append((a, b, texte))
+
+for a, b, texte in sorted(remplacements, reverse=True):
+    t = t[:a] + texte + t[b:]
+
+if ajouts:
+    # Même indentation que le premier réglage, quatre espaces à défaut.
+    premier = min(debuts_cles, default=None)
+    retrait = "    "
+    if premier is not None:
+        debut_ligne = t.rfind("\n", 0, premier) + 1
+        retrait = t[debut_ligne:premier]
+        if retrait.strip():
+            retrait = "    "
+    t = t[:ouverture + 1] + "".join("\n" + retrait + l for l in ajouts) + t[ouverture + 1:]
+
+open(sortie, "w", encoding="utf-8").write(t)
+print("off" if desactive else "on")
+EOF
+    )"; then
+        exit 1
+    fi
+
+    if [[ "$etat" == on ]]; then
+        mkdir -p "$(dirname "$instructions")"
+        tmp_instr="$(mktemp "$instructions.XXXXXX")"
+        # shellcheck disable=SC2064  # expansion immédiate voulue, voir ci-dessus
+        trap "rm -f '$tmp_settings' '$tmp_instr'" EXIT
+        # Le modèle est privé : `gh api` avec le jeton de l'élève, pas curl.
+        if ! gh api "repos/$GITHUB_ORG/$TEMPLATE_REPO/contents/$instructions" \
+                -H "Accept: application/vnd.github.raw" > "$tmp_instr"; then
+            echo "Impossible de télécharger les consignes de Copilot" >&2
+            echo "(réseau, ou token expiré : nsi token)." >&2
+            echo "Rien n'a été changé. Réessaie : nsi ai" >&2
+            exit 1
+        fi
+        mv "$tmp_instr" "$instructions"
+    fi
+    mv "$tmp_settings" "$settings"
+
+    echo ""
+    if [[ "$etat" == on ]]; then
+        echo "IA activée dans VSCode : tu peux discuter avec Copilot."
+        echo "Ses consignes sont dans $instructions."
+    else
+        echo "IA désactivée dans VSCode."
+    fi
+    echo "Les suggestions automatiques dans le code restent désactivées."
+    echo "Pour revenir en arrière : nsi ai"
+}
+
 cmd_toggle_config() {
     # Comme reset-config : la commande agit sur le dépôt, pas sur le dossier
     # courant. Sans cela, lancée depuis ~ ou depuis un sous-dossier, elle
@@ -653,7 +860,7 @@ cmd_toggle_config() {
     aller_dans_le_depot
     local settings=".vscode/settings.json"
     [[ -f "$settings" ]] || { echo "Fichier $settings introuvable. Lance nsi reset-config." >&2; exit 1; }
-    python3 - "$settings" <<'EOF'
+    python_uv "$settings" <<'EOF'
 import sys
 
 # Un settings.json de VSCode est du JSONC : il porte des commentaires, et
@@ -764,6 +971,19 @@ open(chemin, "w", encoding="utf-8").write(t)
 print("Fichiers " + ("affichés" if tout_masque else "masqués")
       + " dans l'explorateur VSCode.")
 EOF
+}
+
+# Le peu de Python dont nsi a besoin (réécrire du JSONC, ce qu'un shell fait
+# mal) passe par uv, jamais par un `python3` du système : nsi n'installe aucune
+# dépendance système qu'il peut éviter. `nsi install base` n'installe pas
+# python3, et rien de ce qu'il pose ne le tire, ni git, ni gh, ni graphviz ;
+# sur macOS, /usr/bin/python3 n'est qu'un talon qui réclame les Command Line
+# Tools. `uv run --no-project` prend un Python géré par uv, en télécharge un
+# s'il n'y en a encore aucun, et ignore le pyproject.toml du dépôt de l'élève.
+# Le script se lit sur stdin (`python -`) : l'appelant lui passe son heredoc.
+python_uv() {
+    exiger_uv
+    uv run --no-project python - "$@"
 }
 
 # `uv sync` sur un uv absent donne « uv: command not found », qui ne dit pas
@@ -1400,6 +1620,9 @@ case "$cmd" in
     reset-config)
         cmd_reset_config
         ;;
+    ai)
+        cmd_ai
+        ;;
     toggle-config)
         cmd_toggle_config
         ;;
@@ -1415,6 +1638,7 @@ case "$cmd" in
         echo "       nsi dir" >&2
         echo "       nsi reset-config" >&2
         echo "       nsi toggle-config" >&2
+        echo "       nsi ai" >&2
         echo "       nsi doctor" >&2
         exit 1
         ;;

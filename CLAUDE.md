@@ -286,6 +286,16 @@ Script shell unique, auto-contenu.
   que là où `nsi` le cherche.
 - `exiger_uv` précède chaque `uv sync` : « uv: command not found » ne dit pas
   quoi faire, « relance `nsi install base` » si.
+- **Aucune dépendance système évitable : le Python vient d'`uv`.** Réécrire le
+  JSONC de `settings.json` (`nsi ai`, `nsi toggle-config`) demande un
+  interpréteur ; il est obtenu par `python_uv`, soit
+  `uv run --no-project python -`, qui prend un Python géré par `uv` et en
+  télécharge un s'il n'y en a aucun. Un `python3` nu dépendrait du paquet
+  système, que `nsi install base` n'installe pas et que rien de ce qu'il pose
+  ne tire (ni `git`, ni `gh`, ni `graphviz`, vérifié par `apt-cache depends`) ;
+  sur macOS, `/usr/bin/python3` n'est qu'un talon qui réclame les Command Line
+  Tools. `python_uv` appelle `exiger_uv` : un `uv` absent donne le message, pas
+  « command not found ».
 - `sudo` n'est employé que pour les paquets système sans alternative
   utilisateur raisonnable : `apt`/`dnf`/`pacman`, Erlang, `build-essential`, `gdb`,
   PostgreSQL, les dépôts `gh` et VSCode.
@@ -358,6 +368,7 @@ nsi pull          # pull + uv sync
 nsi dir           # imprime le dossier de cours, pour `code "$(nsi dir)"`
 nsi reset-config  # remet la configuration du projet à celle du modèle
 nsi toggle-config # bascule l'affichage des fichiers listés par files.exclude
+nsi ai            # bascule chat.disableAIFeatures, suggestions inline toujours coupées
 nsi doctor        # répare le dépôt git abîmé, pose l'extension Python
 ```
 
@@ -610,6 +621,33 @@ distribution. On appelle donc `~/.vscode-server/bin/*/bin/code-server` (ou
 `cli/servers/*/server/bin/code-server`), qui liste et installe sans fenêtre
 ouverte. Ce serveur n'existe qu'après une première ouverture de VSCode sur un
 dossier WSL : sinon, `nsi doctor` le dit. Ailleurs, `code` suffit.
+
+### `nsi ai`
+
+Bascule `"chat.disableAIFeatures"` dans `.vscode/settings.json` du dépôt
+(absent, il vaut `false` : l'IA est active).
+
+- **Quand l'IA s'active**, pose `.github/copilot-instructions.md`, l'emplacement
+  que VSCode lit de lui-même, repris du modèle au même chemin par `gh api`
+  (modèle privé). Les dépôts engendrés depuis l'ajout au modèle l'ont déjà ;
+  `nsi ai` l'apporte aux plus anciens et le remet à jour. Le fichier est aussi
+  dans `TEMPLATE_FICHIERS`, donc `nsi reset-config` le rafraîchit comme les
+  quatre autres, sans passer par une bascule de l'IA.
+- **Les temporaires sont nettoyés par un `trap EXIT`**, Ctrl-C compris : un
+  `.vscode/settings.json.XXXXXX` oublié dans le dépôt serait poussé par le
+  `git add -A` de `nsi push`. Le chemin y est inscrit en guillemets **doubles**,
+  donc évalué au moment où le trap est posé : le trap s'exécute une fois la
+  fonction quittée, hors de portée de ses `local`, et une référence à
+  `$tmp_settings` faisait mourir `nsi` sur « unbound variable » sous `set -u`
+  alors que la commande avait tout fait correctement.
+- **Dans les deux sens**, garantit que les suggestions inline restent coupées :
+  `"github.copilot.enable": { "*": false }` et
+  `"github.copilot.nextEditSuggestions.enabled": false` (doc VSCode, « Inline
+  suggestions »). Remis d'office si l'élève les a changés.
+- Même méthode que `toggle-config` : le JSONC n'est pas parsé puis réécrit,
+  seules les valeurs concernées changent, commentaires intacts.
+- Rien n'est modifié si le téléchargement échoue : le `settings.json` est écrit
+  à côté, puis mis en place une fois les consignes reçues.
 
 ### `nsi push` / `nsi pull`
 

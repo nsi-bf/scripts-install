@@ -53,6 +53,14 @@ mise à jour n'exigent `sudo`.
 utilisateur raisonnable : `apt`/`dnf`/`pacman`, Erlang, `build-essential`,
 `gdb`, PostgreSQL, les dépôts `gh` et VS Code.
 
+**Aucune dépendance système qui puisse être évitée.** Le peu de Python dont
+`nsi` a besoin, pour réécrire le JSONC de `settings.json` (`nsi ai`,
+`nsi toggle-config`), passe par `python_uv`, soit `uv run --no-project python`,
+jamais par un `python3` du système : `nsi install base` ne l'installe pas, rien
+de ce qu'il pose ne le tire, et sur macOS `/usr/bin/python3` n'est qu'un talon
+qui réclame les Command Line Tools. `uv` est déjà là de toute façon, et fournit
+l'interpréteur, qu'il télécharge au besoin.
+
 Distributions prises en charge : Debian et dérivées (`apt`), Fedora (`dnf`),
 Arch et dérivées comme Manjaro (`pacman`), macOS (`brew`). On ne vise pas
 toutes les distributions : un élève qui en a choisi une autre sait chercher.
@@ -88,9 +96,23 @@ l'installation Windows, atteint par l'interop, et il n'ouvre le dossier Linux
 que si l'extension `ms-vscode-remote.remote-wsl` est installée côté Windows.
 `setup-windows.ps1` la pose dans ses deux branches pour cette raison.
 
+## IA dans VS Code : ce que `nsi` impose
+
+Le modèle livre `"chat.disableAIFeatures": true` : un dépôt neuf arrive avec
+l'IA coupée. `nsi ai` la bascule, dans le `settings.json` du dépôt, et ce choix
+appartient à l'élève.
+
+Les suggestions en ligne, elles, ne lui appartiennent pas : `nsi ai` les
+recoupe d'office **dans les deux sens** (`github.copilot.enable` à
+`{ "*": false }`, `github.copilot.nextEditSuggestions.enabled` à `false`),
+et les remet ainsi même si l'élève les avait changées à la main. Il peut
+discuter avec l'IA, il ne peut pas la laisser écrire son code en fantôme dans
+l'éditeur. C'est la seule chose que ce dépôt impose en matière d'IA.
+
 ## Fichiers de configuration élève
 
-`settings.json`, `extensions.json`, `pyproject.toml`, `.gitignore`.
+`settings.json`, `extensions.json`, `pyproject.toml`, `.gitignore`,
+`.github/copilot-instructions.md` (ajouté le 2026-10-28).
 
 Pas de `tasks.json` : il portait un `nsi pull` automatique à l'ouverture du
 dépôt. Un geste que l'élève n'a pas demandé, qu'il ne voit pas passer et qu'il
@@ -110,3 +132,13 @@ dépôts déjà créés. On échange « corriger tout le monde d'un coup » cont
 rattrapent quand la propagation est voulue : `nsi reset-config` côté élève, et
 `equipe_github.py --rafraichir` côté prof, qui réécrit les fichiers tenus dans
 tous les dépôts d'une classe.
+
+`.github/copilot-instructions.md` est dans `TEMPLATE_FICHIERS`, donc
+`nsi reset-config` le remet à neuf comme les quatre autres. Il a en plus une
+troisième voie, `nsi ai` : à chaque activation de l'IA, les consignes de tuteur
+sont reprises du modèle au même chemin. Deux raisons : c'est l'emplacement que
+VS Code lit de lui-même, donc le fichier doit être dans le dépôt de l'élève et
+pas seulement dans le modèle ; et un dépôt engendré avant son ajout au modèle ne
+l'a pas. `nsi ai` ne couvre que l'activation, la désactivation laisse le fichier
+en place : il ne sert alors à personne, et c'est `nsi reset-config` qui le
+rafraîchit en dehors de ce moment.
